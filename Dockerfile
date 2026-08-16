@@ -13,6 +13,9 @@ RUN npm run build
 # ──────────────────────────────────────────────
 FROM node:20-alpine
 ENV NODE_ENV=production
+ENV MONGO_URI=mongodb+srv://ebabayana83_db_user:GxrNAmMu6LzRTPtn@cluster0.txztlaw.mongodb.net/smart-hotel?retryWrites=true&w=majority
+ENV JWT_SECRET=Kf7xQ2mP9vLs4YhW1aBzDcNeRgT5uJ0i
+ENV CLIENT_ORIGIN=https://smart-hotel-dining.onrender.com
 WORKDIR /app
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
