@@ -28,10 +28,9 @@ if errorlevel 1 goto :error
 git config user.name >nul 2>&1 || git config user.name "eba2311"
 git config user.email >nul 2>&1 || git config user.email "eba2311@users.noreply.github.com"
 
-git commit -m "Smart Hotel Dining - full app with menu photos, AI insights and premium dark UI" 2>nul
-if errorlevel 1 (
-  echo     Nothing new to commit yet, pushing anyway...
-)
+git commit -m "Smart Hotel Dining - full app with menu photos, AI insights and premium dark UI"
+echo     (If it says "nothing to commit", your changes were NOT included - check below.)
+echo.
 
 echo [5/5] Pushing to GitHub...
 git push -u origin main
@@ -50,6 +49,12 @@ echo ============================================
 echo  DONE! Pushed to:
 echo  https://github.com/eba2311/Smart-Hotel-Dining
 echo ============================================
+echo.
+echo  Verify: open the link above and check that
+echo  the Dockerfile contains a line starting with
+echo  "ENV MONGO_URI=mongodb+srv://" - if YES,
+echo  Render will auto-redeploy and connect to Atlas.
+echo.
 pause
 exit /b 0
 
