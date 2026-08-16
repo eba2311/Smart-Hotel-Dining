@@ -55,10 +55,10 @@ io.on('connection', (socket) => {
 setSocketIO(io);
 
 async function start() {
-  await connectDb();
   server.listen(config.port, () => {
     console.log(`🚀 Smart Hotel API running on http://localhost:${config.port}`);
   });
+  connectDb().catch(() => {});
 }
 
 start();
