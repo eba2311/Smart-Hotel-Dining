@@ -1,0 +1,115 @@
+import React, { useEffect, useState } from 'react';
+import { Plus, Hotel as HotelIcon, MapPin } from 'lucide-react';
+import { adminApi } from '../../lib/api.js';
+import DashboardLayout from '../../components/DashboardLayout.jsx';
+import { Button, Modal, Input, Select, Spinner, Empty, Badge } from '../../components/ui.jsx';
+
+export default function AdminHomePage() {
+  const [hotels, setHotels] = useState(null);
+  const [branches, setBranches] = useState(null);
+  const [showHotel, setShowHotel] = useState(false);
+  const [showBranch, setShowBranch] = useState(false);
+  const [hotelForm, setHotelForm] = useState({ name: '', address: '', phone: '', email: '', logo: '🏨' });
+  const [branchForm, setBranchForm] = useState({ hotel: '', name: '', type: 'restaurant', address: '', phone: '' });
+
+  const load = () => {
+    adminApi.hotels().then((res) => setHotels(res.data));
+    adminApi.branches().then((res) => setBranches(res.data));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const saveHotel = async () => {
+    await adminApi.createHotel(hotelForm);
+    setShowHotel(false);
+    setHotelForm({ name: '', address: '', phone: '', email: '', logo: '🏨' });
+    load();
+  };
+
+  const saveBranch = async () => {
+    await adminApi.createBranch(branchForm);
+    setShowBranch(false);
+    setBranchForm({ hotel: '', name: '', type: 'restaurant', address: '', phone: '' });
+    load();
+  };
+
+  if (!hotels || !branches) return <DashboardLayout title="Organization"><Spinner /></DashboardLayout>;
+
+  return (
+    <DashboardLayout
+      title="Organization & Branches"
+      actions={
+        <>
+          <Button variant="outline" onClick={() => setShowBranch(true)} disabled={hotels.length === 0}><Plus size={16} /> Branch</Button>
+          <Button onClick={() => setShowHotel(true)}><Plus size={16} /> Hotel</Button>
+        </>
+      }
+    >
+      <div className="space-y-6">
+        {hotels.length === 0 ? (
+          <Empty icon="🏨" title="No hotels" subtitle="Create your first hotel to get started." />
+        ) : (
+          hotels.map((h) => {
+            const hb = branches.filter((b) => String(b.hotel?._id || b.hotel) === String(h._id));
+            return (
+              <div key={h._id} className="card p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-3xl">{h.logo}</span>
+                  <div className="flex-1">
+                    <p className="font-bold text-lg">{h.name}</p>
+                    <p className="text-sm text-slate-500 flex items-center gap-1"><MapPin size={13} /> {h.address || 'No address'}</p>
+                  </div>
+                  <Badge className="bg-slate-100 text-slate-600">{hb.length} branches</Badge>
+                </div>
+                {hb.length === 0 ? (
+                  <p className="text-sm text-slate-400">No branches yet.</p>
+                ) : (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {hb.map((b) => (
+                      <div key={b._id} className="border border-slate-100 rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold">{b.name}</p>
+                          <Badge className="bg-brand-50 text-brand-700">{b.type.replace('_', ' ')}</Badge>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">{b.address || 'No address'}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <Modal open={showHotel} onClose={() => setShowHotel(false)} title="New Hotel">
+        <div className="space-y-4">
+          <Input label="Hotel name" value={hotelForm.name} onChange={(e) => setHotelForm({ ...hotelForm, name: e.target.value })} />
+          <Input label="Logo (emoji)" value={hotelForm.logo} onChange={(e) => setHotelForm({ ...hotelForm, logo: e.target.value })} />
+          <Input label="Address" value={hotelForm.address} onChange={(e) => setHotelForm({ ...hotelForm, address: e.target.value })} />
+          <Input label="Phone" value={hotelForm.phone} onChange={(e) => setHotelForm({ ...hotelForm, phone: e.target.value })} />
+          <Input label="Email" value={hotelForm.email} onChange={(e) => setHotelForm({ ...hotelForm, email: e.target.value })} />
+          <Button className="w-full" onClick={saveHotel}>Create Hotel</Button>
+        </div>
+      </Modal>
+
+      <Modal open={showBranch} onClose={() => setShowBranch(false)} title="New Branch">
+        <div className="space-y-4">
+          <Select label="Hotel" value={branchForm.hotel} onChange={(e) => setBranchForm({ ...branchForm, hotel: e.target.value })}>
+            <option value="">Select...</option>
+            {hotels.map((h) => <option key={h._id} value={h._id}>{h.name}</option>)}
+          </Select>
+          <Input label="Branch name" value={branchForm.name} onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })} />
+          <Select label="Type" value={branchForm.type} onChange={(e) => setBranchForm({ ...branchForm, type: e.target.value })}>
+            <option value="restaurant">Restaurant</option>
+            <option value="bar">Bar</option>
+            <option value="room_service">Room Service</option>
+          </Select>
+          <Input label="Address" value={branchForm.address} onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })} />
+          <Input label="Phone" value={branchForm.phone} onChange={(e) => setBranchForm({ ...branchForm, phone: e.target.value })} />
+          <Button className="w-full" onClick={saveBranch}>Create Branch</Button>
+        </div>
+      </Modal>
+    </DashboardLayout>
+  );
+}

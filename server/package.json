@@ -1,0 +1,31 @@
+{
+  "name": "smart-hotel-server",
+  "version": "1.0.0",
+  "description": "AI-enhanced QR-based smart hotel dining, ordering and service management system - backend",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node node_modules/nodemon/bin/nodemon.js src/index.js",
+    "start": "node src/index.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.1",
+    "morgan": "^1.10.0",
+    "nanoid": "^5.0.7",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.7.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
