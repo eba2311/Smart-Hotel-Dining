@@ -35,7 +35,15 @@ if errorlevel 1 (
 
 echo [5/5] Pushing to GitHub...
 git push -u origin main
-if errorlevel 1 goto :error
+if errorlevel 1 (
+  echo     Push rejected - integrating remote README and retrying...
+  git fetch origin
+  if errorlevel 1 goto :error
+  git pull origin main --allow-unrelated-histories --no-edit -X ours
+  if errorlevel 1 goto :error
+  git push -u origin main
+  if errorlevel 1 goto :error
+)
 
 echo.
 echo ============================================
