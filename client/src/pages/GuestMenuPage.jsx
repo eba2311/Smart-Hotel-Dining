@@ -274,8 +274,8 @@ export default function GuestMenuPage() {
           <p className="text-sm text-slate-500 mt-1">{error}</p>
           <div className="text-xs text-slate-400 mt-4 space-y-1 text-left">
             <p>Make sure:</p>
-            <p>1. The API server is running on port 5000</p>
-            <p>2. MongoDB service is running (port 27017)</p>
+            <p>1. The API server is running (deployed: check its logs)</p>
+            <p>2. The database is reachable (Atlas: check Network Access + seed)</p>
             <p>3. The QR code link is valid</p>
           </div>
           <Button variant="outline" className="mt-4 w-full" onClick={() => { setError(null); setLoading(true); window.location.reload(); }}>
