@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { orderApi, serviceApi, tableApi } from '../../lib/api.js';
-import { useAuth } from '../../context/AuthContext.jsx';
-import { useSocket } from '../../context/SocketContext.jsx';
-import { Spinner, Empty, Badge } from '../../components/ui.jsx';
-import { OrderStatusBadge, ServiceStatusBadge } from '../../components/StatusBadge.jsx';
-import DishImage from '../../components/DishImage.jsx';
-import { SERVICE_TYPE_LABEL, SERVICE_TYPE_ICON, fmtTime } from '../../lib/format.js';
-import { useToast } from '../../context/ToastContext.jsx';
+import { orderApi, serviceApi, tableApi } from '../lib/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import { useSocket } from '../context/SocketContext.jsx';
+import { Spinner, Empty, Badge } from '../components/ui.jsx';
+import { OrderStatusBadge, ServiceStatusBadge } from '../components/StatusBadge.jsx';
+import DishImage from '../components/DishImage.jsx';
+import { SERVICE_TYPE_LABEL, SERVICE_TYPE_ICON, fmtTime } from '../lib/format.js';
+import { useToast } from '../context/ToastContext.jsx';
 import { clsx } from 'clsx';
 
 const WAITER_ORDERS = ['READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'];
