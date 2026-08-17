@@ -4,6 +4,7 @@ import { clsx } from 'clsx';
 import {
   LayoutDashboard, Utensils, Table2, Package, Users, MessageSquare,
   BarChart3, LogOut, ClipboardList, Building2, ScrollText, Home,
+  Ticket, UserCircle, BarChart2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -13,6 +14,7 @@ const managerNav = [
   { to: '/manager/menu', label: 'Menu', icon: Utensils },
   { to: '/manager/tables', label: 'Tables & Rooms', icon: Table2 },
   { to: '/manager/inventory', label: 'Inventory', icon: Package },
+  { to: '/manager/coupons', label: 'Coupons', icon: Ticket },
   { to: '/manager/staff', label: 'Staff', icon: Users },
   { to: '/manager/feedback', label: 'Feedback', icon: MessageSquare },
   { to: '/manager/analytics', label: 'AI Analytics', icon: BarChart3 },
@@ -21,6 +23,7 @@ const managerNav = [
 const adminNav = [
   { to: '/admin', label: 'Organization', icon: Building2, end: true },
   { to: '/admin/users', label: 'Users', icon: Users },
+  { to: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { to: '/admin/audit', label: 'Audit Logs', icon: ScrollText },
 ];
 
@@ -75,6 +78,12 @@ export default function DashboardLayout({ title, children, actions }) {
               <p className="text-xs text-neutral-500 capitalize">{user?.role}{branchLabel}</p>
             </div>
           </div>
+          <button
+            onClick={() => { navigate('/profile'); }}
+            className="flex items-center gap-2 text-sm text-neutral-400 hover:text-brand-400 hover:bg-brand-500/10 w-full px-2 py-1.5 rounded-lg transition-colors"
+          >
+            <UserCircle size={16} /> Profile
+          </button>
           <button
             onClick={() => { logout(); navigate('/login'); }}
             className="flex items-center gap-2 text-sm text-neutral-400 hover:text-brand-400 hover:bg-brand-500/10 w-full px-2 py-1.5 rounded-lg transition-colors"

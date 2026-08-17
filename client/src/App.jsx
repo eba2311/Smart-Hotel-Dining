@@ -4,7 +4,9 @@ import { SocketProvider } from './context/SocketContext.jsx';
 import { CartProvider } from './context/CartContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
+import LandingPage from './pages/LandingPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
 import GuestMenuPage from './pages/GuestMenuPage.jsx';
 import CheckoutPage from './pages/CheckoutPage.jsx';
 import TrackOrderPage from './pages/TrackOrderPage.jsx';
@@ -19,12 +21,14 @@ import OrdersManagerPage from './pages/manager/OrdersManagerPage.jsx';
 import MenuManagerPage from './pages/manager/MenuManagerPage.jsx';
 import TablesPage from './pages/manager/TablesPage.jsx';
 import InventoryPage from './pages/manager/InventoryPage.jsx';
+import CouponManagerPage from './pages/manager/CouponManagerPage.jsx';
 import StaffPage from './pages/manager/StaffPage.jsx';
 import FeedbackManagerPage from './pages/manager/FeedbackPage.jsx';
 import AnalyticsPage from './pages/manager/AnalyticsPage.jsx';
 
 import AdminHomePage from './pages/admin/AdminHomePage.jsx';
 import AdminUsersPage from './pages/admin/AdminUsersPage.jsx';
+import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage.jsx';
 import AuditLogsPage from './pages/admin/AuditLogsPage.jsx';
 
 function RoleHome() {
@@ -43,6 +47,8 @@ export default function App() {
       <SocketProvider>
         <CartProvider>
           <Routes>
+            {/* Public */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
 
             {/* Guest flow */}
@@ -51,6 +57,9 @@ export default function App() {
             <Route path="/track/:orderId" element={<TrackOrderPage />} />
             <Route path="/history/:customerId" element={<OrderHistoryPage />} />
             <Route path="/feedback/:orderId" element={<FeedbackPage />} />
+
+            {/* Profile (all roles) */}
+            <Route path="/profile" element={<ProfilePage />} />
 
             {/* Staff */}
             <Route path="/kitchen" element={<ProtectedRoute role="kitchen"><KitchenDashboard /></ProtectedRoute>} />
@@ -62,6 +71,7 @@ export default function App() {
             <Route path="/manager/menu" element={<ProtectedRoute role="manager"><MenuManagerPage /></ProtectedRoute>} />
             <Route path="/manager/tables" element={<ProtectedRoute role="manager"><TablesPage /></ProtectedRoute>} />
             <Route path="/manager/inventory" element={<ProtectedRoute role="manager"><InventoryPage /></ProtectedRoute>} />
+            <Route path="/manager/coupons" element={<ProtectedRoute role="manager"><CouponManagerPage /></ProtectedRoute>} />
             <Route path="/manager/staff" element={<ProtectedRoute role="manager"><StaffPage /></ProtectedRoute>} />
             <Route path="/manager/feedback" element={<ProtectedRoute role="manager"><FeedbackManagerPage /></ProtectedRoute>} />
             <Route path="/manager/analytics" element={<ProtectedRoute role="manager"><AnalyticsPage /></ProtectedRoute>} />
@@ -69,9 +79,9 @@ export default function App() {
             {/* Admin */}
             <Route path="/admin" element={<ProtectedRoute role="admin"><AdminHomePage /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsersPage /></ProtectedRoute>} />
+            <Route path="/admin/analytics" element={<ProtectedRoute role="admin"><AdminAnalyticsPage /></ProtectedRoute>} />
             <Route path="/admin/audit" element={<ProtectedRoute role="admin"><AuditLogsPage /></ProtectedRoute>} />
 
-            <Route path="/" element={<RoleHome />} />
             <Route path="*" element={<RoleHome />} />
           </Routes>
         </CartProvider>
