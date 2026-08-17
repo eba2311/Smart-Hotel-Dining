@@ -31,6 +31,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false,
   })
 );
 app.use(
