@@ -46,15 +46,6 @@ app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'Smart Hotel API is running' }));
 
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Smart Hotel API is running',
-    client: config.clientOrigin,
-    health: '/api/health',
-  });
-});
-
 app.use('/api', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
