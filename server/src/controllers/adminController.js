@@ -39,6 +39,19 @@ export const updateBranch = asyncHandler(async (req, res) => {
   res.json({ success: true, data: branch });
 });
 
+export const deleteHotel = asyncHandler(async (req, res) => {
+  const hotel = await Hotel.findByIdAndDelete(req.params.id);
+  if (!hotel) throw new AppError('Hotel not found', 404);
+  await Branch.deleteMany({ hotel: req.params.id });
+  res.json({ success: true, data: {} });
+});
+
+export const deleteBranch = asyncHandler(async (req, res) => {
+  const branch = await Branch.findByIdAndDelete(req.params.id);
+  if (!branch) throw new AppError('Branch not found', 404);
+  res.json({ success: true, data: {} });
+});
+
 export const listUsers = asyncHandler(async (req, res) => {
   const users = await User.find().select('-password').sort({ createdAt: -1 });
   res.json({ success: true, data: users });

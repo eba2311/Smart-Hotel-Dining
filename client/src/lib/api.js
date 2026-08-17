@@ -43,6 +43,7 @@ export const catalogApi = {
   createItem: (data) => api.post('/catalog/items', data),
   updateItem: (id, data) => api.patch(`/catalog/items/${id}`, data),
   deleteItem: (id) => api.delete(`/catalog/items/${id}`),
+  bulkAvailability: (branch, available) => api.patch('/catalog/bulk-availability', { branch, available }),
 };
 
 export const orderApi = {
@@ -114,9 +115,11 @@ export const adminApi = {
   hotels: () => api.get('/admin/hotels'),
   createHotel: (data) => api.post('/admin/hotels', data),
   updateHotel: (id, data) => api.patch(`/admin/hotels/${id}`, data),
+  deleteHotel: (id) => api.delete(`/admin/hotels/${id}`),
   branches: (hotel) => api.get('/admin/branches', { params: { hotel } }),
   createBranch: (data) => api.post('/admin/branches', data),
   updateBranch: (id, data) => api.patch(`/admin/branches/${id}`, data),
+  deleteBranch: (id) => api.delete(`/admin/branches/${id}`),
   users: () => api.get('/admin/users'),
   auditLogs: () => api.get('/admin/audit-logs'),
 };

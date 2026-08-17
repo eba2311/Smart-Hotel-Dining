@@ -73,6 +73,10 @@ export const deleteCategory = asyncHandler(async (req, res) => {
 });
 
 export const createMenuItem = asyncHandler(async (req, res) => {
+  if (!req.body.branch) throw new AppError('Branch is required', 400);
+  if (!req.body.name) throw new AppError('Name is required', 400);
+  if (!req.body.category) throw new AppError('Category is required', 400);
+  if (req.body.price === undefined || req.body.price === null) throw new AppError('Price is required', 400);
   const item = await MenuItem.create(req.body);
   res.status(201).json({ success: true, data: item });
 });
@@ -86,12 +90,28 @@ export const updateMenuItem = asyncHandler(async (req, res) => {
 export const deleteMenuItem = asyncHandler(async (req, res) => {
   const item = await MenuItem.findByIdAndDelete(req.params.id);
   if (!item) throw new AppError('Menu item not found', 404);
+  if (item.image && item.image.includes('/uploads/')) {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const filePath = path.join(process.cwd(), 'uploads', path.basename(item.image));
+      await fs.unlink(filePath).catch(() => {});
+    } catch {}
+  }
   res.json({ success: true, message: 'Menu item deleted' });
 });
 
 export const listAllMenu = asyncHandler(async (req, res) => {
   const { branch } = req.query;
   const filter = branch ? { branch } : {};
-  const items = await MenuItem.find(filter).populate('category');
+  const items = await MenuItem.find(filter).populate('category').sort({ sortOrder: 1, name: 1 });
   res.json({ success: true, data: items });
+});
+
+export const bulkAvailability = asyncHandler(async (req, res) => {
+  const { branch, available } = req.body;
+  if (!branch) throw new AppError('Branch is required', 400);
+  if (typeof available !== 'boolean') throw new AppError('available must be true or false', 400);
+  const result = await MenuItem.updateMany({ branch }, { $set: { available } });
+  res.json({ success: true, data: { modified: result.modifiedCount } });
 });

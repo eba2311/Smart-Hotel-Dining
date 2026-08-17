@@ -3,6 +3,8 @@ import { adminApi, staffApi } from '../../lib/api.js';
 import DashboardLayout from '../../components/DashboardLayout.jsx';
 import { Spinner, Empty, Badge, Button, Modal, Input, Select } from '../../components/ui.jsx';
 import { fmtDateTime } from '../../lib/format.js';
+import { Search, Trash2 } from 'lucide-react';
+import { useToast } from '../../context/ToastContext.jsx';
 
 const ROLE_COLORS = {
   admin: 'bg-slate-900 text-white',
@@ -13,10 +15,13 @@ const ROLE_COLORS = {
 };
 
 export default function AdminUsersPage() {
+  const toast = useToast();
   const [users, setUsers] = useState(null);
   const [editing, setEditing] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'guest', phone: '' });
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = () => {
     adminApi.users().then((res) => setUsers(res.data)).catch(() => setUsers([]));
@@ -25,6 +30,7 @@ export default function AdminUsersPage() {
   useEffect(() => { load(); }, []);
 
   const save = async () => {
+    setSaving(true);
     try {
       if (editing) {
         await staffApi.update(editing._id, { name: form.name, phone: form.phone, role: form.role, password: form.password || undefined });
@@ -34,22 +40,38 @@ export default function AdminUsersPage() {
       setEditing(null);
       setShowModal(false);
       setForm({ name: '', email: '', password: '', role: 'guest', phone: '' });
+      toast.success(editing ? 'User updated' : 'User created');
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message || 'Failed to save user'); } finally { setSaving(false); }
+  };
+
+  const remove = async (u) => {
+    if (!confirm('Delete this user?')) return;
+    try {
+      await staffApi.remove(u._id);
+      toast.success('User deleted');
+      load();
+    } catch (e) { toast.error(e.message || 'Failed to delete'); }
   };
 
   const toggleActive = async (u) => {
-    await staffApi.update(u._id, { active: !u.active });
-    load();
+    try {
+      await staffApi.update(u._id, { active: !u.active });
+      toast.success(u.active ? 'User disabled' : 'User enabled');
+      load();
+    } catch (e) { toast.error(e.message || 'Failed to update status'); }
   };
 
   if (!users) return <DashboardLayout title="Users"><Spinner /></DashboardLayout>;
+
+  const filtered = users.filter((u) => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()) || u.role?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <DashboardLayout
       title="User Management"
       actions={<Button onClick={() => { setEditing(null); setShowModal(true); setForm({ name: '', email: '', password: '', role: 'guest', phone: '' }); }}>New User</Button>}
     >
+      <div className="mb-4"><input type="text" placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full md:w-80 px-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" /></div>
       {users.length === 0 ? (
         <Empty title="No users" />
       ) : (
@@ -66,7 +88,7 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filtered.map((u) => (
                 <tr key={u._id} className="border-b border-slate-50">
                   <td className="px-4 py-3 font-medium">{u.name}</td>
                   <td className="px-4 py-3 text-slate-500">{u.email}</td>
@@ -79,6 +101,7 @@ export default function AdminUsersPage() {
                     <div className="flex gap-1 justify-end">
                       <Button variant="outline" className="!py-1 text-xs" onClick={() => { setEditing(u); setShowModal(true); setForm({ name: u.name, email: u.email, password: '', role: u.role, phone: u.phone || '' }); }}>Edit</Button>
                       <Button variant="outline" className="!py-1 text-xs" onClick={() => toggleActive(u)}>{u.active ? 'Disable' : 'Enable'}</Button>
+                      <Button variant="outline" className="!py-1 text-xs !border-rose-200 !text-rose-600 hover:!bg-rose-50" onClick={() => remove(u)}><Trash2 className="w-3 h-3" /></Button>
                     </div>
                   </td>
                 </tr>
@@ -101,7 +124,7 @@ export default function AdminUsersPage() {
             <option value="admin">Admin</option>
           </Select>
           <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Button className="w-full" onClick={save}>{editing ? 'Save' : 'Create User'}</Button>
+          <Button className="w-full" onClick={save} disabled={saving}>{editing ? 'Save' : 'Create User'}</Button>
         </div>
       </Modal>
     </DashboardLayout>

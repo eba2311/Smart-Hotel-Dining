@@ -7,6 +7,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, BarChart, Bar, CartesianGrid,
 } from 'recharts';
 import DashboardLayout from '../../components/DashboardLayout.jsx';
+import { useSocket } from '../../context/SocketContext.jsx';
 import { StatCard, Spinner, Empty, Select, ProgressBar } from '../../components/ui.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
 import { analyticsApi } from '../../lib/api.js';
@@ -15,11 +16,30 @@ import DishImage from '../../components/DishImage.jsx';
 
 export default function DashboardPage() {
   const { branch, branches, setBranch } = useBranch();
+  const { on } = useSocket();
   const [data, setData] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const refresh = () => {
+    if (branch) analyticsApi.summary(branch).then((res) => { setData(res.data); setLastUpdated(Date.now()); }).catch(() => {});
+  };
 
   useEffect(() => {
     if (!branch) return;
-    analyticsApi.summary(branch).then((res) => setData(res.data)).catch(() => setData(null));
+    analyticsApi.summary(branch).then((res) => { setData(res.data); setLastUpdated(Date.now()); }).catch(() => setData(null));
+  }, [branch]);
+
+  useEffect(() => {
+    if (!on) return;
+    const offNew = on('order:new', refresh);
+    const offStatus = on('order:status', refresh);
+    return () => { offNew(); offStatus(); };
+  }, [on, branch]);
+
+  useEffect(() => {
+    if (!branch) return;
+    const interval = setInterval(refresh, 30000);
+    return () => clearInterval(interval);
   }, [branch]);
 
   const statusTotals = (statusMap) => {
@@ -41,6 +61,7 @@ export default function DashboardPage() {
         <Spinner label="Loading dashboard..." />
       ) : (
         <div className="space-y-6">
+          {lastUpdated && <p className="text-xs text-slate-400">Last updated: {new Date(lastUpdated).toLocaleTimeString()}</p>}
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={<Banknote size={22} />} label="Today's Sales" value={fmtMoney(data.todaySales)} sub={`Last 7 days: ${fmtMoney(data.last7Sales)}`} color="bg-emerald-50 text-emerald-600" />
             <StatCard icon={<ClipboardList size={22} />} label="Orders Today" value={data.todayOrders} sub={`Active: ${data.activeOrders}`} color="bg-sky-50 text-sky-600" />

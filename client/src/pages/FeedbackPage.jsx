@@ -18,15 +18,21 @@ export default function FeedbackPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
+  const [orderError, setOrderError] = useState('');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [hover, setHover] = useState(0);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
-    orderApi.get(orderId).then((res) => setOrder(res.data)).catch(() => {});
+    setFetching(true);
+    orderApi.get(orderId)
+      .then((res) => setOrder(res.data))
+      .catch((e) => setOrderError(e.message || 'Order not found'))
+      .finally(() => setFetching(false));
   }, [orderId]);
 
   const submit = async () => {
@@ -83,6 +89,21 @@ export default function FeedbackPage() {
             </div>
           </div>
           <Button className="mt-5" onClick={() => navigate('/')}>Back to menu</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (fetching) return <Spinner label="Loading order..." />;
+
+  if (orderError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="card p-8 max-w-md w-full text-center">
+          <div className="text-5xl mb-3">❌</div>
+          <h1 className="text-xl font-bold mb-1">Order Not Found</h1>
+          <p className="text-sm text-slate-500 mb-5">{orderError}</p>
+          <Button onClick={() => navigate(-1)}>Go Back</Button>
         </div>
       </div>
     );

@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, QrCode, Download, RefreshCw, Trash2 } from 'lucide-react';
+import { Plus, QrCode, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { tableApi } from '../../lib/api.js';
 import DashboardLayout from '../../components/DashboardLayout.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
+import { useToast } from '../../context/ToastContext.jsx';
 import { Button, Modal, Input, Select, Badge, Spinner, Empty } from '../../components/ui.jsx';
 import QrDisplay from '../../components/QrDisplay.jsx';
 
 export default function TablesPage() {
   const { branch, branches, setBranch } = useBranch();
+  const toast = useToast();
   const [tab, setTab] = useState('tables');
   const [tables, setTables] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -21,7 +23,7 @@ export default function TablesPage() {
     setLoading(true);
     Promise.all([tableApi.tables(branch), tableApi.rooms(branch)])
       .then(([t, r]) => { setTables(t.data); setRooms(r.data); })
-      .catch(() => {})
+      .catch(() => toast.error('Failed to load'))
       .finally(() => setLoading(false));
   };
 
@@ -34,14 +36,17 @@ export default function TablesPage() {
       setShowAdd(false);
       setForm({ number: '', seats: 2, floor: 1, roomType: 'Standard' });
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message || 'Failed to create'); }
   };
 
   const remove = async (kind, id) => {
     if (!confirm('Delete this entry?')) return;
-    if (kind === 'table') await tableApi.deleteTable(id);
-    else await tableApi.deleteRoom(id);
-    load();
+    try {
+      if (kind === 'table') await tableApi.deleteTable(id);
+      else await tableApi.deleteRoom(id);
+      toast.success('Deleted');
+      load();
+    } catch (e) { toast.error(e.message || 'Failed to delete'); }
   };
 
   const downloadQr = (item, kind) => {
@@ -88,7 +93,7 @@ export default function TablesPage() {
                   <Button variant="outline" className="!py-1.5 text-xs flex-1" onClick={() => downloadQr(t, 'table')}>
                     <QrCode size={14} /> QR
                   </Button>
-                  <Button variant="outline" className="!py-1.5 text-xs" onClick={async () => { await tableApi.regenerateTableQr(t._id); load(); }}>
+                  <Button variant="outline" className="!py-1.5 text-xs" onClick={async () => { try { await tableApi.regenerateTableQr(t._id); toast.success('QR regenerated'); load(); } catch (e) { toast.error(e.message || 'Failed to regenerate'); } }}>
                     <RefreshCw size={14} />
                   </Button>
                   <Button variant="outline" className="!py-1.5 text-xs !text-rose-500" onClick={() => remove('table', t._id)}>
@@ -114,7 +119,7 @@ export default function TablesPage() {
                 <Button variant="outline" className="!py-1.5 text-xs flex-1" onClick={() => downloadQr(r, 'room')}>
                   <QrCode size={14} /> QR
                 </Button>
-                <Button variant="outline" className="!py-1.5 text-xs" onClick={async () => { await tableApi.regenerateRoomQr(r._id); load(); }}>
+                <Button variant="outline" className="!py-1.5 text-xs" onClick={async () => { try { await tableApi.regenerateRoomQr(r._id); toast.success('QR regenerated'); load(); } catch (e) { toast.error(e.message || 'Failed to regenerate'); } }}>
                   <RefreshCw size={14} />
                 </Button>
                 <Button variant="outline" className="!py-1.5 text-xs !text-rose-500" onClick={() => remove('room', r._id)}>
@@ -154,14 +159,9 @@ export default function TablesPage() {
               {`${window.location.origin}${window.location.pathname}#/menu/${qrTarget.item.qrToken}`}
             </p>
             <Button className="mt-4 w-full" onClick={() => {
-              const a = document.createElement('a');
-              a.href = `${window.location.origin}${window.location.pathname}#/menu/${qrTarget.item.qrToken}`;
-              a.download = `qr-${qrTarget.kind}-${qrTarget.item.number}.png`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
+              navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#/menu/${qrTarget.item.qrToken}`).then(() => toast.success('QR link copied!'));
             }}>
-              <Download size={16} /> Download
+              <Copy size={16} /> Copy Link
             </Button>
           </div>
         )}

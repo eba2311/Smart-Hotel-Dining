@@ -5,8 +5,10 @@ import DashboardLayout from '../../components/DashboardLayout.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
 import { Button, Modal, Input, Select, Spinner, Empty, ProgressBar, Badge } from '../../components/ui.jsx';
 import { fmtDateTime } from '../../lib/format.js';
+import { useToast } from '../../context/ToastContext.jsx';
 
 export default function InventoryPage() {
+  const toast = useToast();
   const { branch, branches, setBranch } = useBranch();
   const [ingredients, setIngredients] = useState(null);
   const [tx, setTx] = useState([]);
@@ -14,13 +16,15 @@ export default function InventoryPage() {
   const [form, setForm] = useState({ name: '', unit: 'g', stock: 1000, lowStockThreshold: 200 });
   const [stockTarget, setStockTarget] = useState(null);
   const [stockValue, setStockValue] = useState(0);
+  const [restockTarget, setRestockTarget] = useState(null);
+  const [restockQty, setRestockQty] = useState('');
 
   const load = () => {
     if (!branch) return;
     setIngredients(null);
     Promise.all([inventoryApi.list(branch), inventoryApi.transactions(branch)])
       .then(([i, t]) => { setIngredients(i.data); setTx(t.data); })
-      .catch(() => setIngredients([]));
+      .catch(() => { toast.error('Failed to load inventory'); setIngredients([]); });
   };
 
   useEffect(() => { load(); }, [branch]);
@@ -31,14 +35,21 @@ export default function InventoryPage() {
       setShowAdd(false);
       setForm({ name: '', unit: 'g', stock: 1000, lowStockThreshold: 200 });
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message || 'Failed to create ingredient'); }
   };
 
-  const restock = async (ing) => {
-    const qty = Number(prompt(`Add stock to ${ing.name} (currently ${ing.stock} ${ing.unit}):`));
-    if (!qty || qty <= 0) return;
-    await inventoryApi.restock(ing._id, qty, branch);
-    load();
+  const restock = (ing) => {
+    setRestockTarget(ing);
+    setRestockQty('');
+  };
+
+  const saveRestock = async () => {
+    try {
+      await inventoryApi.restock(restockTarget._id, Number(restockQty), branch);
+      toast.success('Stock restocked');
+      setRestockTarget(null);
+      load();
+    } catch (e) { toast.error(e.message || 'Failed to restock ingredient'); }
   };
 
   const adjust = async (ing) => {
@@ -47,9 +58,12 @@ export default function InventoryPage() {
   };
 
   const saveAdjust = async () => {
-    await inventoryApi.adjust(stockTarget._id, Number(stockValue), branch);
-    setStockTarget(null);
-    load();
+    try {
+      await inventoryApi.adjust(stockTarget._id, Number(stockValue), branch);
+      toast.success('Stock adjusted');
+      setStockTarget(null);
+      load();
+    } catch (e) { toast.error(e.message || 'Failed to adjust stock'); }
   };
 
   if (!ingredients) return <DashboardLayout title="Inventory"><Spinner /></DashboardLayout>;
@@ -153,6 +167,14 @@ export default function InventoryPage() {
         <div className="space-y-4">
           <Input label="New stock level" type="number" value={stockValue} onChange={(e) => setStockValue(e.target.value)} />
           <Button className="w-full" onClick={saveAdjust}>Save</Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!restockTarget} onClose={() => setRestockTarget(null)} title={`Restock ${restockTarget?.name}`}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">Current stock: {restockTarget?.stock} {restockTarget?.unit}</p>
+          <Input label="Quantity to add" type="number" value={restockQty} onChange={(e) => setRestockQty(e.target.value)} placeholder="0" />
+          <Button className="w-full" onClick={saveRestock} loading={false}>Add Stock</Button>
         </div>
       </Modal>
     </DashboardLayout>

@@ -22,7 +22,10 @@ export default function FeedbackPage() {
 
   useEffect(() => {
     if (!branch) return;
-    reviewApi.list(branch).then((res) => setReviews(res.data)).catch(() => setReviews([]));
+    setReviews(null);
+    reviewApi.list(branch)
+      .then((res) => setReviews(res.data))
+      .catch(() => setReviews([]));
   }, [branch]);
 
   const runAnalyzer = async () => {
@@ -55,7 +58,7 @@ export default function FeedbackPage() {
               <div key={r._id} className="card p-5">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-amber-400 text-lg">{"★".repeat(r.rating)}<span className="text-slate-200">{"★".repeat(5 - r.rating)}</span></span>
+                    <span className="text-amber-400 text-lg">{"★".repeat(r.rating || 0)}<span className="text-slate-200">{"★".repeat(5 - (r.rating || 0))}</span></span>
                     <span className="text-sm font-medium">{r.customerName}</span>
                   </div>
                   <Badge className={SENTIMENT_COLORS[r.sentiment?.overall] || 'bg-slate-100'}>{r.sentiment?.overall}</Badge>
@@ -90,7 +93,7 @@ export default function FeedbackPage() {
                 <Badge className={SENTIMENT_COLORS[analyzer.result.overall]}>{analyzer.result.overall}</Badge>
                 <p className="text-sm text-slate-600 mt-2">{analyzer.result.summary}</p>
                 <div className="mt-2 space-y-1">
-                  {analyzer.result.aspects.map((a) => (
+                  {(analyzer.result.aspects || []).map((a) => (
                     <div key={a.aspect} className="flex justify-between text-xs">
                       <span className="text-slate-500">{ASPECT_LABELS[a.aspect] || a.aspect}</span>
                       <span className={clsx('font-bold capitalize', a.sentiment === 'positive' ? 'text-emerald-600' : a.sentiment === 'negative' ? 'text-rose-600' : 'text-slate-500')}>

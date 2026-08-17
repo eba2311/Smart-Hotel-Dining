@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useMemo, useCallback } 
 
 const CartContext = createContext(null);
 
-const load = (branch) => {
+const loadCart = (branch) => {
   try {
     return JSON.parse(localStorage.getItem(`sh_cart_${branch}`) || '[]');
   } catch {
@@ -10,96 +10,111 @@ const load = (branch) => {
   }
 };
 
+function formatOptions(menuItem, selected) {
+  if (!selected || selected.length === 0) return [];
+  return selected
+    .map((sel) => {
+      const opt = (menuItem.options || []).find((o) => String(o.id) === String(sel.optionId));
+      if (!opt) return null;
+      const labels = (sel.choiceIds || [])
+        .map((cid) => opt.choices.find((c) => String(c.id) === String(cid))?.label)
+        .filter(Boolean);
+      return labels.length ? `${opt.name}: ${labels.join(', ')}` : null;
+    })
+    .filter(Boolean);
+}
+
+function calcOptionsDelta(menuItem, options) {
+  return (options || []).reduce((sum, sel) => {
+    const opt = (menuItem.options || []).find((o) => String(o.id) === String(sel.optionId));
+    if (!opt) return sum;
+    return (
+      sum +
+      (sel.choiceIds || []).reduce((s, cid) => {
+        const c = opt.choices.find((c2) => String(c2.id) === String(cid));
+        return s + (c?.priceDelta || 0);
+      }, 0)
+    );
+  }, 0);
+}
+
 export function CartProvider({ children }) {
   const [branch, setBranch] = useState(null);
   const [items, setItems] = useState([]);
 
   useEffect(() => {
-    if (branch) setItems(load(branch));
+    if (branch) setItems(loadCart(branch));
   }, [branch]);
-
-  const persist = useCallback(
-    (next) => {
-      setItems(next);
-      if (branch) localStorage.setItem(`sh_cart_${branch}`, JSON.stringify(next));
-    },
-    [branch]
-  );
 
   const addItem = useCallback(
     (menuItem, qty, options, note) => {
       const key = `${menuItem._id}:${JSON.stringify(options)}`;
-      const existing = items.find((i) => i.key === key);
-      if (existing) {
-        persist(
-          items.map((i) => (i.key === key ? { ...i, qty: i.qty + qty } : i))
-        );
-      } else {
-        const optionsDelta = (options || []).reduce((sum, sel) => {
-          const opt = (menuItem.options || []).find((o) => String(o.id) === String(sel.optionId));
-          if (!opt) return sum;
-          return (
-            sum +
-            (sel.choiceIds || []).reduce((s, cid) => {
-              const c = opt.choices.find((c2) => String(c2.id) === String(cid));
-              return s + (c?.priceDelta || 0);
-            }, 0)
-          );
-        }, 0);
-        persist([
-          ...items,
-          {
-            key,
-            menuItem,
-            qty,
-            options: options || [],
-            optionsLabel: formatOptions(menuItem, options),
-            unitPrice: menuItem.price + optionsDelta,
-            note: note || '',
-          },
-        ]);
-      }
+      const optionsDelta = calcOptionsDelta(menuItem, options);
+      const unitPrice = Number(menuItem.price || 0) + optionsDelta;
+
+      setItems((prev) => {
+        const existing = prev.find((i) => i.key === key);
+        let next;
+        if (existing) {
+          next = prev.map((i) => (i.key === key ? { ...i, qty: i.qty + qty } : i));
+        } else {
+          next = [
+            ...prev,
+            {
+              key,
+              menuItem,
+              qty,
+              options: options || [],
+              optionsLabel: formatOptions(menuItem, options),
+              unitPrice,
+              note: note || '',
+            },
+          ];
+        }
+        if (branch) localStorage.setItem(`sh_cart_${branch}`, JSON.stringify(next));
+        return next;
+      });
     },
-    [items, persist]
+    [branch]
   );
 
   const updateQty = useCallback(
     (key, qty) => {
-      if (qty <= 0) persist(items.filter((i) => i.key !== key));
-      else persist(items.map((i) => (i.key === key ? { ...i, qty } : i)));
+      setItems((prev) => {
+        const next = qty <= 0 ? prev.filter((i) => i.key !== key) : prev.map((i) => (i.key === key ? { ...i, qty } : i));
+        if (branch) localStorage.setItem(`sh_cart_${branch}`, JSON.stringify(next));
+        return next;
+      });
     },
-    [items, persist]
+    [branch]
   );
 
   const removeItem = useCallback(
-    (key) => persist(items.filter((i) => i.key !== key)),
-    [items, persist]
+    (key) => {
+      setItems((prev) => {
+        const next = prev.filter((i) => i.key !== key);
+        if (branch) localStorage.setItem(`sh_cart_${branch}`, JSON.stringify(next));
+        return next;
+      });
+    },
+    [branch]
   );
 
-  const clear = useCallback(() => persist([]), [persist]);
+  const clear = useCallback(() => {
+    setItems((prev) => {
+      if (branch) localStorage.setItem(`sh_cart_${branch}`, JSON.stringify([]));
+      return [];
+    });
+  }, [branch]);
 
-  const subtotal = useMemo(() => items.reduce((s, i) => s + i.unitPrice * i.qty, 0), [items]);
+  const subtotal = useMemo(() => items.reduce((s, i) => s + Number(i.unitPrice || 0) * i.qty, 0), [items]);
   const count = useMemo(() => items.reduce((s, i) => s + i.qty, 0), [items]);
 
   return (
-    <CartContext.Provider
-      value={{ branch, setBranch, items, addItem, updateQty, removeItem, clear, subtotal, count }}
-    >
+    <CartContext.Provider value={{ branch, setBranch, items, addItem, updateQty, removeItem, clear, subtotal, count }}>
       {children}
     </CartContext.Provider>
   );
-}
-
-function formatOptions(menuItem, selected) {
-  if (!selected || selected.length === 0) return [];
-  return selected.map((sel) => {
-    const opt = (menuItem.options || []).find((o) => String(o.id) === String(sel.optionId));
-    if (!opt) return null;
-    const labels = (sel.choiceIds || [])
-      .map((cid) => opt.choices.find((c) => String(c.id) === String(cid))?.label)
-      .filter(Boolean);
-    return labels.length ? `${opt.name}: ${labels.join(', ')}` : null;
-  }).filter(Boolean);
 }
 
 export const useCart = () => useContext(CartContext);

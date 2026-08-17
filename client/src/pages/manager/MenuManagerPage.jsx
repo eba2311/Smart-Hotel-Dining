@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, UploadCloud, Image as ImageIcon, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, UploadCloud, Image as ImageIcon, X, Search } from 'lucide-react';
 import { catalogApi, uploadApi } from '../../lib/api.js';
 import DashboardLayout from '../../components/DashboardLayout.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
 import { Button, Modal, Input, Select, Textarea, Badge, Spinner, Empty } from '../../components/ui.jsx';
 import { fmtMoney } from '../../lib/format.js';
 import DishImage from '../../components/DishImage.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
 
 const emptyItem = {
   name: '', description: '', image: '', price: 100, promotionPrice: '',
@@ -15,15 +16,18 @@ const emptyItem = {
 
 export default function MenuManagerPage() {
   const { branch, branches, setBranch } = useBranch();
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [showItem, setShowItem] = useState(false);
   const [editing, setEditing] = useState(null);
   const [showCat, setShowCat] = useState(false);
+  const [editingCat, setEditingCat] = useState(null);
   const [catForm, setCatForm] = useState({ name: '', description: '', icon: '🍽️', sortOrder: 0 });
   const [itemForm, setItemForm] = useState({ ...emptyItem });
   const [ingredients, setIngredients] = useState([]);
   const [saving, setSaving] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [search, setSearch] = useState('');
 
   const resizeImage = (file) =>
     new Promise((resolve, reject) => {
@@ -47,14 +51,14 @@ export default function MenuManagerPage() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!file.type.startsWith('image/')) return alert('Please choose an image file');
+    if (!file.type.startsWith('image/')) return toast.error('Please choose an image file');
     setUploadingImg(true);
     try {
       const dataUrl = await resizeImage(file);
       const res = await uploadApi.image(dataUrl);
       setItemForm((f) => ({ ...f, image: res.data.url }));
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message || 'Failed to upload image');
     } finally {
       setUploadingImg(false);
     }
@@ -94,9 +98,10 @@ export default function MenuManagerPage() {
       if (editing) await catalogApi.updateItem(editing._id, payload);
       else await catalogApi.createItem(payload);
       setShowItem(false);
+      toast.success(editing ? 'Item updated' : 'Item created');
       load();
     } catch (e) {
-      alert(e.message);
+      toast.error(e.message || 'Failed to save item');
     } finally {
       setSaving(false);
     }
@@ -108,13 +113,15 @@ export default function MenuManagerPage() {
       await catalogApi.createCategory({ ...catForm, branch });
       setShowCat(false);
       setCatForm({ name: '', description: '', icon: '🍽️', sortOrder: 0 });
+      toast.success('Category created');
       load();
-    } catch (e) { alert(e.message); } finally { setSaving(false); }
+    } catch (e) { toast.error(e.message || 'Failed to create category'); } finally { setSaving(false); }
   };
 
   const deleteItem = async (item) => {
     if (!confirm(`Delete ${item.name}?`)) return;
     await catalogApi.deleteItem(item._id);
+    toast.success('Item deleted');
     load();
   };
 
@@ -122,8 +129,30 @@ export default function MenuManagerPage() {
     if (!confirm(`Delete category ${c.name}?`)) return;
     try {
       await catalogApi.deleteCategory(c._id);
+      toast.success('Category deleted');
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message || 'Failed to delete category'); }
+  };
+
+  const updateCategory = async () => {
+    setSaving(true);
+    try {
+      await catalogApi.updateCategory(editingCat._id, catForm);
+      setShowCat(false);
+      setEditingCat(null);
+      setCatForm({ name: '', description: '', icon: '🍽️', sortOrder: 0 });
+      toast.success('Category updated');
+      load();
+    } catch (e) { toast.error(e.message || 'Failed to update category'); } finally { setSaving(false); }
+  };
+
+  const toggleAllAvailability = async (available) => {
+    if (!branch) return;
+    try {
+      const res = await catalogApi.bulkAvailability(branch, available);
+      toast.success(`${res.data.modified} items ${available ? 'enabled' : 'disabled'}`);
+      load();
+    } catch (e) { toast.error(e.message || 'Failed to toggle availability'); }
   };
 
   if (!data) return <DashboardLayout title="Menu Management"><Spinner /></DashboardLayout>;
@@ -141,12 +170,26 @@ export default function MenuManagerPage() {
           <Button onClick={() => { setEditing(null); setItemForm({ ...emptyItem, category: data.categories[0]?._id }); setShowItem(true); }}>
             <Plus size={16} /> Menu Item
           </Button>
+          <Button onClick={() => toggleAllAvailability(false)} variant="outline" className="!text-rose-500">Disable All</Button>
+          <Button onClick={() => toggleAllAvailability(true)} variant="outline" className="!text-emerald-500">Enable All</Button>
         </>
       }
     >
+      <div className="mb-4">
+        <div className="relative max-w-md">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            className="input pl-10"
+            placeholder="Search menu items..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
       <div className="space-y-8">
         {data.categories.map((c) => {
-          const items = data.items.filter((i) => String(i.category?._id || i.category) === String(c._id));
+          const items = data.items.filter((i) => String(i.category?._id || i.category) === String(c._id))
+            .filter((i) => !search || i.name?.toLowerCase().includes(search.toLowerCase()) || i.description?.toLowerCase().includes(search.toLowerCase()));
           return (
             <div key={c._id}>
               <div className="flex items-center justify-between mb-3">
@@ -154,9 +197,14 @@ export default function MenuManagerPage() {
                   <span className="text-xl">{c.icon}</span> {c.name}
                   <Badge className="bg-slate-100 text-slate-500">{items.length} items</Badge>
                 </h2>
-                <button onClick={() => deleteCat(c)} className="text-rose-400 hover:text-rose-600" title="Delete category">
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex gap-1">
+                  <button onClick={() => { setEditingCat(c); setCatForm({ name: c.name, description: c.description || '', icon: c.icon || '🍽️', sortOrder: c.sortOrder || 0 }); setShowCat(true); }} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500">
+                    <Pencil size={15} />
+                  </button>
+                  <button onClick={() => deleteCat(c)} className="p-2 rounded-lg hover:bg-rose-50 text-rose-400">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
               {items.length === 0 ? (
                 <p className="text-sm text-slate-400 mb-4">No items in this category.</p>
@@ -207,12 +255,14 @@ export default function MenuManagerPage() {
       </div>
 
       {/* Category modal */}
-      <Modal open={showCat} onClose={() => setShowCat(false)} title="New Category">
+      <Modal open={showCat} onClose={() => { setShowCat(false); setEditingCat(null); setCatForm({ name: '', description: '', icon: '🍽️', sortOrder: 0 }); }} title={editingCat ? `Edit ${editingCat.name}` : 'New Category'}>
         <div className="space-y-4">
           <Input label="Name" value={catForm.name} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })} />
           <Input label="Icon (emoji)" value={catForm.icon} onChange={(e) => setCatForm({ ...catForm, icon: e.target.value })} />
           <Textarea label="Description" value={catForm.description} onChange={(e) => setCatForm({ ...catForm, description: e.target.value })} />
-          <Button className="w-full" onClick={saveCategory} loading={saving}>Create</Button>
+          <Button className="w-full" onClick={editingCat ? updateCategory : saveCategory} loading={saving}>
+            {editingCat ? 'Save Changes' : 'Create'}
+          </Button>
         </div>
       </Modal>
 
@@ -305,17 +355,42 @@ export default function MenuManagerPage() {
             </div>
           </div>
           <div className="sm:col-span-2">
-            <p className="label">Customization options (JSON)</p>
-            <Textarea
-              rows={4}
-              value={JSON.stringify(itemForm.options || [], null, 1)}
-              onChange={(e) => {
-                try { setItemForm({ ...itemForm, options: JSON.parse(e.target.value || '[]') }); } catch { /* invalid JSON */ }
-              }}
-            />
-            <p className="text-xs text-slate-400 mt-1">
-              Example: [{"{\"id\":\"extras\",\"name\":\"Extras\",\"type\":\"multi\",\"required\":false,\"choices\":[{\"id\":\"cheese\",\"label\":\"Extra cheese\",\"priceDelta\":50}]}"}]
-            </p>
+            <p className="label">Customization Options</p>
+            <div className="space-y-3">
+              {(itemForm.options || []).map((opt, oi) => (
+                <div key={oi} className="border border-slate-200 rounded-xl p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Input label="Option name" value={opt.name || ''} onChange={(e) => {
+                      const opts = [...itemForm.options]; opts[oi] = { ...opts[oi], name: e.target.value }; setItemForm({ ...itemForm, options: opts });
+                    }} />
+                    <Select label="Type" value={opt.type || 'single'} onChange={(e) => {
+                      const opts = [...itemForm.options]; opts[oi] = { ...opts[oi], type: e.target.value }; setItemForm({ ...itemForm, options: opts });
+                    }}>
+                      <option value="single">Single choice</option>
+                      <option value="multi">Multiple choice</option>
+                    </Select>
+                    <button onClick={() => { const opts = [...itemForm.options]; opts.splice(oi, 1); setItemForm({ ...itemForm, options: opts }); }} className="mt-6 p-1.5 text-rose-400 hover:text-rose-600"><Trash2 size={15} /></button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {(opt.choices || []).map((ch, ci) => (
+                      <div key={ci} className="flex items-center gap-2 text-sm">
+                        <input className="input flex-1" placeholder="Label" value={ch.label || ''} onChange={(e) => {
+                          const opts = [...itemForm.options]; const choices = [...opts[oi].choices]; choices[ci] = { ...choices[ci], label: e.target.value }; opts[oi] = { ...opts[oi], choices }; setItemForm({ ...itemForm, options: opts });
+                        }} />
+                        <input className="input w-24" type="number" placeholder="Price Δ" value={ch.priceDelta || 0} onChange={(e) => {
+                          const opts = [...itemForm.options]; const choices = [...opts[oi].choices]; choices[ci] = { ...choices[ci], priceDelta: Number(e.target.value) }; opts[oi] = { ...opts[oi], choices }; setItemForm({ ...itemForm, options: opts });
+                        }} />
+                        <button onClick={() => { const opts = [...itemForm.options]; const choices = [...opts[oi].choices]; choices.splice(ci, 1); opts[oi] = { ...opts[oi], choices }; setItemForm({ ...itemForm, options: opts }); }} className="text-rose-400 hover:text-rose-600"><X size={14} /></button>
+                      </div>
+                    ))}
+                    <button onClick={() => {
+                      const opts = [...itemForm.options]; const choices = [...(opts[oi].choices || []), { id: `ch_${Date.now()}`, label: '', priceDelta: 0 }]; opts[oi] = { ...opts[oi], choices }; setItemForm({ ...itemForm, options: opts });
+                    }} className="text-xs text-brand-600 hover:text-brand-700 font-semibold">+ Add choice</button>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => setItemForm({ ...itemForm, options: [...(itemForm.options || []), { id: `opt_${Date.now()}`, name: '', type: 'single', choices: [] }] })} className="btn-outline text-xs w-full">+ Add option group</button>
+            </div>
           </div>
           <label className="flex items-center gap-2 text-sm font-medium">
             <input type="checkbox" className="accent-brand-600" checked={itemForm.available} onChange={(e) => setItemForm({ ...itemForm, available: e.target.checked })} />

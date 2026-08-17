@@ -4,9 +4,10 @@ import { clsx } from 'clsx';
 import {
   LayoutDashboard, Utensils, Table2, Package, Users, MessageSquare,
   BarChart3, LogOut, ClipboardList, Building2, ScrollText, Home,
-  Ticket, UserCircle, BarChart2,
+  Ticket, UserCircle, BarChart2, WifiOff,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useSocket } from '../context/SocketContext.jsx';
 
 const managerNav = [
   { to: '/manager', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -29,6 +30,7 @@ const adminNav = [
 
 export default function DashboardLayout({ title, children, actions }) {
   const { user, logout } = useAuth();
+  const { connected } = useSocket();
   const navigate = useNavigate();
   const nav = user?.role === 'admin' ? adminNav : managerNav;
 
@@ -101,6 +103,11 @@ export default function DashboardLayout({ title, children, actions }) {
           </div>
           <div className="flex items-center gap-2">
             {actions}
+            {connected === false && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-rose-500 bg-rose-50 px-2.5 py-1 rounded-full">
+                <WifiOff size={13} /> Offline
+              </span>
+            )}
             <button onClick={() => { logout(); navigate('/login'); }} className="p-2 rounded-lg hover:bg-slate-100 md:hidden" title="Sign out">
               <LogOut size={18} />
             </button>

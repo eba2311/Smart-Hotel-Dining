@@ -10,6 +10,7 @@ import {
   updateMenuItem,
   deleteMenuItem,
   listAllMenu,
+  bulkAvailability,
 } from '../controllers/catalogController.js';
 import { protect, restrictTo } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -64,5 +65,6 @@ router.patch(
   updateMenuItem
 );
 router.delete('/items/:id', protect, restrictTo('manager', 'admin'), audit('menuItem.delete', (req) => `menuItem:${req.params.id}`), deleteMenuItem);
+router.patch('/bulk-availability', protect, restrictTo('manager', 'admin'), audit('menuItem.bulkAvailability', (req) => `branch:${req.body.branch}`), bulkAvailability);
 
 export default router;
