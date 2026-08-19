@@ -76,8 +76,9 @@ function Ticket({ o, busy, onAct }) {
             )}
           </div>
           <p className="text-sm text-slate-500">
-            {o.table ? `Table ${o.table?.number}` : o.room ? `Room ${o.room?.number}` : 'Takeaway'}
-            {o.customerName && o.customerName !== 'Guest' && <span className="text-slate-400"> · {o.customerName}</span>}
+            {o.table ? `Table ${o.table?.number}` : o.room ? `Room ${o.room?.number}` : o.deliveryLocation || 'Takeaway'}
+            {o.deliveryLocation && (o.table || o.room) && <span className="font-semibold text-brand-600 ml-1">· {o.deliveryLocation}</span>}
+            {o.customerName && o.customerName !== 'Guest' && <span className="text-slate-400 ml-1">· {o.customerName}</span>}
           </p>
         </div>
         <OrderStatusBadge status={o.status} />

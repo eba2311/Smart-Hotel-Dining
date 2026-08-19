@@ -43,7 +43,9 @@ app.use(
 );
 app.use(express.json({ limit: '20mb' }));
 app.use(cookieParser());
-if (config.nodeEnv === 'development') app.use(morgan('dev'));
+if (config.nodeEnv === 'development') {
+  app.use(morgan('dev'));
+}
 
 app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
@@ -71,7 +73,7 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/coupons', couponRoutes);
 
-const distPath = path.resolve(__dirname, '../client/dist');
+const distPath = path.resolve(__dirname, '../../client/dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
   app.use((req, res, next) => {
@@ -79,6 +81,11 @@ if (fs.existsSync(distPath)) {
       return next();
     }
     res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  // Fallback for when the client is not built yet
+  app.get('/', (req, res) => {
+    res.status(200).send('Smart Hotel API is running. The frontend client has not been built yet.');
   });
 }
 

@@ -30,6 +30,7 @@ const orderSchema = new mongoose.Schema(
     branch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
     table: { type: mongoose.Schema.Types.ObjectId, ref: 'Table' },
     room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room' },
+    deliveryLocation: { type: String, default: '' },
     customerId: { type: String, default: '' },
     customerName: { type: String, default: 'Guest' },
     items: [orderItemSchema],

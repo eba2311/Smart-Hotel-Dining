@@ -149,7 +149,9 @@ export default function WaiterDashboard() {
                     <OrderStatusBadge status={o.status} />
                   </div>
                   <p className="text-sm text-slate-500 mb-2">
-                    {o.table ? `Table ${o.table?.number}` : o.room ? `Room ${o.room?.number}` : 'Takeaway'} · {fmtTime(o.createdAt)}
+                    {o.table ? `Table ${o.table?.number}` : o.room ? `Room ${o.room?.number}` : o.deliveryLocation || 'Takeaway'}
+                    {o.deliveryLocation && (o.table || o.room) && <span className="font-semibold text-brand-600 ml-1">· {o.deliveryLocation}</span>}
+                    <span className="ml-1">· {fmtTime(o.createdAt)}</span>
                   </p>
                   <div className="text-sm text-slate-600 space-y-1 mb-3">
                     {(o.items || []).map((it, i) => (

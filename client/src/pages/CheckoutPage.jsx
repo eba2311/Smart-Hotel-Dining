@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Smartphone, Landmark, Banknote, Tag, Users, Percent, Sparkles, Plus } from 'lucide-react';
 import { useCart } from '../context/CartContext.jsx';
@@ -162,6 +162,7 @@ export default function CheckoutPage() {
   const { branch, items, clear, subtotal, addItem } = useCart();
   const toast = useToast();
   const [name, setName] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState('');
   const [method, setMethod] = useState('cash');
   const [coupon, setCoupon] = useState('');
   const [loading, setLoading] = useState(false);
@@ -209,6 +210,7 @@ export default function CheckoutPage() {
         branch,
         customerId: guestId(),
         customerName: name.trim() || 'Guest',
+        deliveryLocation: deliveryLocation.trim(),
         source: 'qr',
         paymentMethod: method,
         couponCode: coupon.trim() || undefined,
@@ -268,6 +270,14 @@ export default function CheckoutPage() {
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name (optional)"
             />
+            <div className="mt-4">
+              <Input
+                label="Delivery Location"
+                value={deliveryLocation}
+                onChange={(e) => setDeliveryLocation(e.target.value)}
+                placeholder="e.g. Poolside Chair 4, Lobby Area, Room 102"
+              />
+            </div>
           </div>
 
           <div className="card p-5">

@@ -89,7 +89,8 @@ export default function TrackOrderPage() {
 
   const cancellable = ['CREATED', 'PAYMENT_PENDING', 'CONFIRMED', 'KITCHEN_ACCEPTED'].includes(order.status);
   const eta = ETA[order.status];
-  const loc = order.table ? `Table ${order.table?.number}` : order.room ? `Room ${order.room?.number}` : 'Takeaway';
+  const locBase = order.table ? `Table ${order.table?.number}` : order.room ? `Room ${order.room?.number}` : order.deliveryLocation || 'Takeaway';
+  const loc = (order.deliveryLocation && (order.table || order.room)) ? `${locBase} · ${order.deliveryLocation}` : locBase;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-50 to-slate-50 dark:from-neutral-950 dark:to-neutral-900">

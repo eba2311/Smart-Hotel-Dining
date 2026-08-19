@@ -49,7 +49,7 @@ const buildServerItems = (menuItems, lineItems) =>
   });
 
 export const createOrder = asyncHandler(async (req, res) => {
-  const { branch, table, room, customerId, customerName, items, couponCode, paymentMethod, source, note, tip, idempotencyKey } = req.body;
+  const { branch, table, room, deliveryLocation, customerId, customerName, items, couponCode, paymentMethod, source, note, tip, idempotencyKey } = req.body;
 
   if (!Array.isArray(items) || items.length === 0) {
     throw new AppError('Order must contain at least one item', 400);
@@ -85,6 +85,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       branch,
       table,
       room,
+      deliveryLocation,
       customerId,
       customerName,
       items: serverItems,

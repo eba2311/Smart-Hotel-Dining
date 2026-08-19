@@ -8,7 +8,6 @@ const connectionOptions = {
   maxPoolSize: 50, // Maximum number of connections in the connection pool
   minPoolSize: 5,  // Minimum number of connections in the connection pool
   maxIdleTimeMS: 30000, // Close idle connections after 30 seconds
-  idleTimeoutMS: 60000,  // Close idle sessions after 60 seconds
   retryWrites: true,
   retryReads: true,
   // Enable compression for network traffic
