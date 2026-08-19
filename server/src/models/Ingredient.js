@@ -5,7 +5,7 @@ const ingredientSchema = new mongoose.Schema(
     branch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
     name: { type: String, required: true, trim: true },
     unit: { type: String, default: 'g' },
-    stock: { type: Number, default: 0 },
+    stock: { type: Number, default: 0, min: 0 },
     lowStockThreshold: { type: Number, default: 500 },
     costPerUnit: { type: Number, default: 0 },
     active: { type: Boolean, default: true },

@@ -19,5 +19,6 @@ const kitchenTicketSchema = new mongoose.Schema(
 );
 
 kitchenTicketSchema.index({ branch: 1, status: 1, createdAt: -1 });
+kitchenTicketSchema.index({ order: 1 });
 
 export default mongoose.model('KitchenTicket', kitchenTicketSchema);

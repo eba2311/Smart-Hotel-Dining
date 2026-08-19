@@ -17,4 +17,7 @@ const paymentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+paymentSchema.index({ order: 1 }, { unique: true });
+paymentSchema.index({ branch: 1, status: 1 });
+
 export default mongoose.model('Payment', paymentSchema);

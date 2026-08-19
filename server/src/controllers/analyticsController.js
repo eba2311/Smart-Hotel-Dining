@@ -57,7 +57,7 @@ export const summary = asyncHandler(async (req, res) => {
       { $match: branch ? { branch } : {} },
       { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
     ]),
-    Ingredient.find(branch ? { branch, stock: { $lte: 0 } } : { stock: { $lte: 0 } }).select('name stock lowStockThreshold'),
+    Ingredient.find(branch ? { branch } : {}).then((ings) => ings.filter((i) => i.stock <= i.lowStockThreshold)).then((low) => low.map((i) => ({ _id: i._id, name: i.name, stock: i.stock, lowStockThreshold: i.lowStockThreshold }))),
     Order.aggregate([
       { $match: { ...base, createdAt: { $gte: last7 }, status: { $nin: ['CANCELLED'] } } },
       { $project: { day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, total: 1 } },
@@ -96,7 +96,7 @@ export const summary = asyncHandler(async (req, res) => {
 
 export const revenueByPeriod = asyncHandler(async (req, res) => {
   const { branch, days = 30 } = req.query;
-  const since = new Date(Date.now() - parseInt(days, 10) * 24 * 3600 * 1000);
+  const since = new Date(Date.now() - Math.max(1, parseInt(days, 10) || 30) * 24 * 3600 * 1000);
   const rows = await Order.aggregate([
     { $match: { ...branchFilter(branch), createdAt: { $gte: since }, status: { $nin: ['CANCELLED'] } } },
     { $project: { day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, total: 1 } },
@@ -147,7 +147,15 @@ export const demandForecast = asyncHandler(async (req, res) => {
   const { branch } = req.query;
   if (!branch) throw new AppError('branch is required', 400);
   const date = req.query.date ? new Date(req.query.date) : new Date(Date.now() + 24 * 3600 * 1000);
+  if (isNaN(date.getTime())) throw new AppError('Invalid date parameter', 400);
   const data = await predictDemand({ branch, date, save: true });
+  res.json({ success: true, data });
+});
+
+export const todayDemand = asyncHandler(async (req, res) => {
+  const { branch } = req.query;
+  if (!branch) throw new AppError('branch is required', 400);
+  const data = await predictDemand({ branch, date: new Date(), save: false });
   res.json({ success: true, data });
 });
 

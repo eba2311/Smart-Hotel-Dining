@@ -12,7 +12,7 @@ const attachToken = (doc) => {
 export const listTables = asyncHandler(async (req, res) => {
   const { branch } = req.query;
   const filter = branch ? { branch } : {};
-  const tables = await Table.find(filter).sort({ number: 1 });
+  const tables = await Table.find(filter).collation({ locale: 'en', numericOrdering: true }).sort({ number: 1 });
   res.json({ success: true, data: tables });
 });
 
@@ -22,7 +22,8 @@ export const createTable = asyncHandler(async (req, res) => {
 });
 
 export const updateTable = asyncHandler(async (req, res) => {
-  const table = await Table.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const { number, label, seats, status, active } = req.body;
+  const table = await Table.findByIdAndUpdate(req.params.id, { number, label, seats, status, active }, { new: true, runValidators: true });
   if (!table) throw new AppError('Table not found', 404);
   res.json({ success: true, data: table });
 });
@@ -45,7 +46,7 @@ export const regenerateTableQr = asyncHandler(async (req, res) => {
 export const listRooms = asyncHandler(async (req, res) => {
   const { branch } = req.query;
   const filter = branch ? { branch } : {};
-  const rooms = await Room.find(filter).sort({ number: 1 });
+  const rooms = await Room.find(filter).collation({ locale: 'en', numericOrdering: true }).sort({ number: 1 });
   res.json({ success: true, data: rooms });
 });
 
@@ -55,7 +56,8 @@ export const createRoom = asyncHandler(async (req, res) => {
 });
 
 export const updateRoom = asyncHandler(async (req, res) => {
-  const room = await Room.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const { number, floor, roomType, status, active } = req.body;
+  const room = await Room.findByIdAndUpdate(req.params.id, { number, floor, roomType, status, active }, { new: true, runValidators: true });
   if (!room) throw new AppError('Room not found', 404);
   res.json({ success: true, data: room });
 });

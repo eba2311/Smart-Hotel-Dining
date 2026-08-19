@@ -37,11 +37,20 @@ export async function getRecommendations({ branch, customerId, cartItemIds = [],
   const myItems = new Map();
   const myIngredientSet = new Set();
 
+  const historyMenuItemIds = new Set();
+  for (const o of history) {
+    for (const it of o.items) {
+      if (it.menuItem) historyMenuItemIds.add(String(it.menuItem));
+    }
+  }
+  const historyMenuItems = await MenuItem.find({ _id: { $in: [...historyMenuItemIds] } }).select('ingredients');
+  const historyIngMap = new Map(historyMenuItems.map((mi) => [String(mi._id), mi.ingredients || []]));
+
   for (const o of history) {
     for (const it of o.items) {
       if (!it.menuItem) continue;
       myItems.set(String(it.menuItem), (myItems.get(String(it.menuItem)) || 0) + it.quantity);
-      for (const ing of it.ingredients || []) myIngredientSet.add(ing.toLowerCase());
+      for (const ing of historyIngMap.get(String(it.menuItem)) || []) myIngredientSet.add(String(ing).toLowerCase());
     }
   }
 
@@ -68,7 +77,7 @@ export async function getRecommendations({ branch, customerId, cartItemIds = [],
 
   for (const item of menuItems) {
     const id = String(item._id);
-    if (cartItemIds.includes(id)) continue;
+    if (cartItemIds.map(String).includes(id)) continue;
 
     let score = 0;
     const reasons = [];
@@ -85,7 +94,7 @@ export async function getRecommendations({ branch, customerId, cartItemIds = [],
       reasons.push('you ordered it before');
     }
 
-    const overlap = item.ingredients.filter((ing) => myIngredientSet.has(String(ing).toLowerCase())).length;
+    const overlap = (item.ingredients || []).filter((ing) => myIngredientSet.has(String(ing).toLowerCase())).length;
     if (overlap > 0) {
       score += 0.5 * overlap;
       if (overlap >= 2) reasons.push('it shares ingredients with your past favourites');

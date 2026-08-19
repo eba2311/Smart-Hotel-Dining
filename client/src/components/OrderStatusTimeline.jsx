@@ -2,13 +2,16 @@ import React from 'react';
 import { clsx } from 'clsx';
 import { Check } from 'lucide-react';
 
-const FLOW = ['CREATED', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERED', 'COMPLETED'];
+const FLOW = ['CREATED', 'PAYMENT_PENDING', 'CONFIRMED', 'KITCHEN_ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'];
 
 const LABELS = {
   CREATED: 'Order Placed',
+  PAYMENT_PENDING: 'Payment',
   CONFIRMED: 'Confirmed',
+  KITCHEN_ACCEPTED: 'In Kitchen',
   PREPARING: 'Being Prepared',
   READY: 'Ready',
+  OUT_FOR_DELIVERY: 'On the Way',
   DELIVERED: 'Delivered',
   COMPLETED: 'Completed',
 };

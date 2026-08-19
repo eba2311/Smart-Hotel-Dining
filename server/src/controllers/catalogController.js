@@ -2,9 +2,14 @@ import MenuCategory from '../models/MenuCategory.js';
 import MenuItem from '../models/MenuItem.js';
 import Table from '../models/Table.js';
 import Room from '../models/Room.js';
+import Order from '../models/Order.js';
+import Review from '../models/Review.js';
+import fs from 'fs/promises';
+import path from 'path';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { inventoryService } from '../services/inventory/inventoryService.js';
+import { getRecommendations } from '../services/ai/recommendation.js';
 
 export const resolveQr = asyncHandler(async (req, res) => {
   const { token } = req.params;
@@ -16,7 +21,7 @@ export const resolveQr = asyncHandler(async (req, res) => {
     success: true,
     data: {
       kind: table ? 'table' : 'room',
-      label: table ? `Table ${table.number}` : `Room ${room.number}`,
+      label: table ? `Table ${table.number}` : `Room ${target.number}`,
       id: target._id,
       number: target.number,
       branch: target.branch,
@@ -40,6 +45,14 @@ export const getMenu = asyncHandler(async (req, res) => {
   const items = await MenuItem.find({ branch, available: true, category: { $in: categories.map((c) => c._id) } })
     .populate('category')
     .sort({ sortOrder: 1, name: 1 });
+
+  const popularity = await Order.aggregate([
+    { $match: { branch, status: { $ne: 'CANCELLED' } } },
+    { $unwind: '$items' },
+    { $group: { _id: '$items.menuItem', orderCount: { $sum: '$items.quantity' } } },
+  ]);
+  const popMap = new Map(popularity.map((p) => [String(p._id), p.orderCount]));
+
   res.json({
     success: true,
     data: {
@@ -48,6 +61,7 @@ export const getMenu = asyncHandler(async (req, res) => {
         ...i.toObject(),
         price: i.promotionPrice && i.promotionPrice < i.price ? i.promotionPrice : i.price,
         originalPrice: i.promotionPrice && i.promotionPrice < i.price ? i.price : null,
+        orderCount: popMap.get(String(i._id)) || 0,
       })),
     },
   });
@@ -59,7 +73,8 @@ export const createCategory = asyncHandler(async (req, res) => {
 });
 
 export const updateCategory = asyncHandler(async (req, res) => {
-  const category = await MenuCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const { name, description, icon, sortOrder, active } = req.body;
+  const category = await MenuCategory.findByIdAndUpdate(req.params.id, { name, description, icon, sortOrder, active }, { new: true, runValidators: true });
   if (!category) throw new AppError('Category not found', 404);
   res.json({ success: true, data: category });
 });
@@ -82,7 +97,8 @@ export const createMenuItem = asyncHandler(async (req, res) => {
 });
 
 export const updateMenuItem = asyncHandler(async (req, res) => {
-  const item = await MenuItem.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const { category, name, description, image, price, promotionPrice, ingredients, allergens, calories, prepTimeMinutes, available, special, options, ingredientLinks, sortOrder } = req.body;
+  const item = await MenuItem.findByIdAndUpdate(req.params.id, { category, name, description, image, price, promotionPrice, ingredients, allergens, calories, prepTimeMinutes, available, special, options, ingredientLinks, sortOrder }, { new: true, runValidators: true });
   if (!item) throw new AppError('Menu item not found', 404);
   res.json({ success: true, data: item });
 });
@@ -92,8 +108,6 @@ export const deleteMenuItem = asyncHandler(async (req, res) => {
   if (!item) throw new AppError('Menu item not found', 404);
   if (item.image && item.image.includes('/uploads/')) {
     try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
       const filePath = path.join(process.cwd(), 'uploads', path.basename(item.image));
       await fs.unlink(filePath).catch(() => {});
     } catch {}
@@ -114,4 +128,74 @@ export const bulkAvailability = asyncHandler(async (req, res) => {
   if (typeof available !== 'boolean') throw new AppError('available must be true or false', 400);
   const result = await MenuItem.updateMany({ branch }, { $set: { available } });
   res.json({ success: true, data: { modified: result.modifiedCount } });
+});
+
+export const getRecommendationsForGuest = asyncHandler(async (req, res) => {
+  const { branch, customerId } = req.query;
+  if (!branch) throw new AppError('branch is required', 400);
+  const recs = await getRecommendations({ branch, customerId: customerId || undefined, limit: 8 });
+  res.json({ success: true, data: recs });
+});
+
+export const getItemRatings = asyncHandler(async (req, res) => {
+  const { branch } = req.query;
+  if (!branch) throw new AppError('branch is required', 400);
+  const ratings = await Review.aggregate([
+    { $match: { branch } },
+    { $unwind: '$items' },
+    { $group: {
+      _id: '$items.menuItem',
+      avgRating: { $avg: '$rating' },
+      reviewCount: { $sum: 1 },
+    }},
+    { $lookup: { from: 'menuitems', localField: '_id', foreignField: '_id', as: 'menuItem' }},
+    { $unwind: { path: '$menuItem', preserveNullAndEmptyArrays: true }},
+    { $project: {
+      _id: 1,
+      name: '$menuItem.name',
+      image: '$menuItem.image',
+      avgRating: { $round: ['$avgRating', 1] },
+      reviewCount: 1,
+    }},
+    { $sort: { avgRating: -1 } },
+  ]);
+  res.json({ success: true, data: ratings });
+});
+
+export const frequentlyCoOrdered = asyncHandler(async (req, res) => {
+  const { branch, menuItemId } = req.query;
+  if (!branch || !menuItemId) throw new AppError('branch and menuItemId are required', 400);
+  const coOrders = await Order.aggregate([
+    { $match: { branch, status: { $ne: 'CANCELLED' } } },
+    { $match: { 'items.menuItem': menuItemId } },
+    { $unwind: '$items' },
+    { $match: { 'items.menuItem': { $ne: menuItemId } } },
+    { $group: { _id: '$items.menuItem', count: { $sum: '$items.quantity' } } },
+    { $sort: { count: -1 } },
+    { $limit: 6 },
+  ]);
+  const itemIds = coOrders.map((c) => c._id);
+  const menuItems = await MenuItem.find({ _id: { $in: itemIds }, branch, available: true }).populate('category');
+  const itemMap = new Map(menuItems.map((m) => [String(m._id), m]));
+  res.json({
+    success: true,
+    data: coOrders
+      .map((c) => ({ item: itemMap.get(String(c._id)), count: c.count }))
+      .filter((c) => c.item)
+      .map(({ item, count }) => ({
+        _id: item._id,
+        name: item.name,
+        image: item.image,
+        price: item.promotionPrice && item.promotionPrice < item.price ? item.promotionPrice : item.price,
+        category: item.category?.name,
+        orderCount: count,
+      })),
+  });
+});
+
+export const tableAvailability = asyncHandler(async (req, res) => {
+  const { branch } = req.query;
+  if (!branch) throw new AppError('branch is required', 400);
+  const tables = await Table.find({ branch, active: true }).collation({ locale: 'en', numericOrdering: true }).select('number status seats').sort({ number: 1 });
+  res.json({ success: true, data: tables });
 });

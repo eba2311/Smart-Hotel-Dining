@@ -7,6 +7,7 @@ const serviceRequestSchema = new mongoose.Schema(
     room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room' },
     table: { type: mongoose.Schema.Types.ObjectId, ref: 'Table' },
     guestName: { type: String, default: 'Guest' },
+    customerId: { type: String },
     type: { type: String, enum: SERVICE_TYPES, required: true },
     note: { type: String, default: '' },
     status: { type: String, enum: Object.values(SERVICE_STATUS), default: 'pending' },

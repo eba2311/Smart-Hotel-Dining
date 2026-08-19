@@ -21,7 +21,7 @@ function elapsed(createdAt) {
 
 export default function WaiterDashboard() {
   const { user } = useAuth();
-  const { joinBranch, on, socket } = useSocket();
+  const { on, socket } = useSocket();
   const toast = useToast();
   const [tab, setTab] = useState('orders');
   const [orders, setOrders] = useState(null);
@@ -67,7 +67,7 @@ export default function WaiterDashboard() {
       setRequests((prev) => (prev ? prev.map((x) => (String(x._id) === String(r._id) ? r : x)) : prev));
     });
     return () => { offStatus(); offReady(); offNewReq(); offUpdReq(); };
-  }, [on, toast]);
+  }, [on, toast, socket]);
 
   const pendingRequests = useMemo(() => (requests || []).filter((r) => ['pending', 'accepted', 'processing'].includes(r.status)), [requests]);
 
@@ -152,7 +152,7 @@ export default function WaiterDashboard() {
                     {o.table ? `Table ${o.table?.number}` : o.room ? `Room ${o.room?.number}` : 'Takeaway'} · {fmtTime(o.createdAt)}
                   </p>
                   <div className="text-sm text-slate-600 space-y-1 mb-3">
-                    {o.items.map((it, i) => (
+                    {(o.items || []).map((it, i) => (
                       <p key={i} className="flex items-center gap-1.5">
                         <DishImage src={it.image} alt={it.name} size="w-7 h-7" textSize="text-xs" />
                         <span className="flex-1">{it.name}</span>

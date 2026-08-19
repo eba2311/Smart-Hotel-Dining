@@ -44,8 +44,10 @@ export default function InventoryPage() {
   };
 
   const saveRestock = async () => {
+    const qty = Number(restockQty);
+    if (!qty || qty <= 0) return toast.error('Quantity must be greater than 0');
     try {
-      await inventoryApi.restock(restockTarget._id, Number(restockQty), branch);
+      await inventoryApi.restock(restockTarget._id, qty, branch);
       toast.success('Stock restocked');
       setRestockTarget(null);
       load();

@@ -33,5 +33,5 @@ export const uploadImage = asyncHandler(async (req, res) => {
   const name = `menu-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
   fs.writeFileSync(path.join(UPLOAD_DIR, name), buf);
 
-  res.status(201).json({ success: true, data: { url: `http://${req.get('host')}/uploads/${name}` } });
+  res.status(201).json({ success: true, data: { url: `${req.protocol}://${req.get('host')}/uploads/${name}` } });
 });

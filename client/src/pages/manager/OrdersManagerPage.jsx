@@ -14,7 +14,7 @@ const STATUS_ORDER = ['PAYMENT_PENDING', 'CONFIRMED', 'KITCHEN_ACCEPTED', 'PREPA
 
 export default function OrdersManagerPage() {
   const { branch, branches, setBranch } = useBranch();
-  const { on, socket } = useSocket();
+  const { on, socket, connected } = useSocket();
   const toast = useToast();
   const [orders, setOrders] = useState(null);
   const [filter, setFilter] = useState('');
@@ -41,7 +41,7 @@ export default function OrdersManagerPage() {
       setSelected((prev) => (prev && String(prev._id) === String(o._id) ? o : prev));
     });
     return () => { offNew(); offStatus(); };
-  }, [on, toast]);
+  }, [on, toast, socket]);
 
   useEffect(() => { setPage(0); }, [filter, search]);
 
@@ -74,8 +74,8 @@ export default function OrdersManagerPage() {
         return (
           o.orderNumber?.toLowerCase().includes(q) ||
           o.customerName?.toLowerCase().includes(q) ||
-          String(o.table?.number).includes(q) ||
-          String(o.room?.number).includes(q)
+          String(o.table?.number ?? '').includes(q) ||
+          String(o.room?.number ?? '').includes(q)
         );
       })
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -97,7 +97,7 @@ export default function OrdersManagerPage() {
       title="Orders"
       actions={
         <div className="flex gap-2">
-          {!socket?.connected && <span className="text-xs text-rose-500 font-semibold flex items-center gap-1"><WifiOff size={14} /> Disconnected</span>}
+          {!connected && <span className="text-xs text-rose-500 font-semibold flex items-center gap-1"><WifiOff size={14} /> Disconnected</span>}
           <Select value={branch} onChange={(e) => setBranch(e.target.value)} className="w-48">
             <option value="">All branches</option>
             {branches.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
@@ -151,7 +151,7 @@ export default function OrdersManagerPage() {
                       <td className="px-4 py-3 font-bold">{o.orderNumber}</td>
                       <td className="px-4 py-3 text-slate-600">{o.customerName || 'Guest'}</td>
                       <td className="px-4 py-3 text-slate-600">{o.table ? `Table ${o.table?.number}` : o.room ? `Room ${o.room?.number}` : '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{o.items.reduce((s, i) => s + i.quantity, 0)} items</td>
+                      <td className="px-4 py-3 text-slate-600">{(o.items || []).reduce((s, i) => s + i.quantity, 0)} items</td>
                       <td className="px-4 py-3 font-semibold">{fmtMoney(o.total)}</td>
                       <td className="px-4 py-3">
                         <span className={`badge capitalize text-[10px] ${o.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : o.paymentStatus === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -190,7 +190,7 @@ export default function OrdersManagerPage() {
             <div>
               <p className="font-bold mb-2">Items</p>
               <div className="space-y-2">
-                {selected.items.map((it, i) => (
+                {(selected.items || []).map((it, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     <DishImage src={it.image} alt={it.name} size="w-9 h-9" textSize="text-base" />
                     <div className="flex-1">

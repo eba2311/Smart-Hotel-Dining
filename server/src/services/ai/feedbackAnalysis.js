@@ -37,40 +37,70 @@ const ASPECTS = {
   },
 };
 
-const NEGATIONS = ['not', 'no', 'never', 'didn', "didn't", 'wasnt', "wasn't", 'isnt', "isn't", 'barely', 'hardly'];
+const NEGATIONS = ['not', 'no', 'never', 'didn', "didn't", 'wasnt', "wasn't", 'isnt', "isn't"];
 
-function analyzeAspect(text, words, aspect) {
-  let positive = 0;
-  let negative = 0;
+function analyzeAspect(text, words, { aspect, label, positive, negative }) {
+  let posCount = 0;
+  let negCount = 0;
   const hits = { positive: [], negative: [] };
+  const matchedIndices = new Set();
+
+  const multiPos = positive.filter((k) => k.includes(' '));
+  const multiNeg = negative.filter((k) => k.includes(' '));
+  const singlePos = positive.filter((k) => !k.includes(' '));
+  const singleNeg = negative.filter((k) => !k.includes(' '));
+
+  for (const phrase of multiPos) {
+    let idx = text.indexOf(phrase);
+    while (idx !== -1) {
+      const before = text.slice(Math.max(0, idx - 15), idx).trim().split(/\s+/);
+      const negated = before.some((w) => NEGATIONS.includes(w));
+      if (!negated) { posCount += 1; hits.positive.push(phrase); }
+      else { negCount += 1; hits.negative.push(phrase); }
+      idx = text.indexOf(phrase, idx + phrase.length);
+    }
+  }
+
+  for (const phrase of multiNeg) {
+    let idx = text.indexOf(phrase);
+    while (idx !== -1) {
+      const before = text.slice(Math.max(0, idx - 15), idx).trim().split(/\s+/);
+      const negated = before.some((w) => NEGATIONS.includes(w));
+      if (!negated) { negCount += 1; hits.negative.push(phrase); }
+      else { posCount += 1; hits.positive.push(phrase); }
+      idx = text.indexOf(phrase, idx + phrase.length);
+    }
+  }
 
   words.forEach((word, idx) => {
-    const isPos = aspect.positive.includes(word);
-    const isNeg = aspect.negative.includes(word);
+    const isPos = singlePos.includes(word);
+    const isNeg = singleNeg.includes(word);
     if (!isPos && !isNeg) return;
+    if (matchedIndices.has(idx)) return;
+    matchedIndices.add(idx);
 
-    const context = words.slice(Math.max(0, idx - 3), idx);
+    const context = words.slice(Math.max(0, idx - 5), idx);
     const negated = context.some((w) => NEGATIONS.includes(w));
     const polarity = isPos ? 1 : -1;
     const final = negated ? -polarity : polarity;
 
     if (final > 0) {
-      positive += 1;
+      posCount += 1;
       hits.positive.push(word);
     } else {
-      negative += 1;
+      negCount += 1;
       hits.negative.push(word);
     }
   });
 
   let score = 0;
   let sentiment = 'neutral';
-  if (positive + negative > 0) {
-    score = (positive - negative) / (positive + negative);
+  if (posCount + negCount > 0) {
+    score = (posCount - negCount) / (posCount + negCount);
     sentiment = score > 0.15 ? 'positive' : score < -0.15 ? 'negative' : 'neutral';
   }
 
-  return { aspect, sentiment, score: Math.round(score * 100), keywords: [...hits.positive, ...hits.negative].slice(0, 5) };
+  return { aspect, label, sentiment, score: Math.round(score * 100), keywords: [...hits.positive, ...hits.negative].slice(0, 5) };
 }
 
 export function analyzeFeedback(comment) {

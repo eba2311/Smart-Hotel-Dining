@@ -1,10 +1,18 @@
 export const fmtMoney = (n) => `${Number(n || 0).toLocaleString()} ETB`;
 
-export const fmtTime = (d) =>
-  new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+export const fmtTime = (d) => {
+  if (!d) return '—';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '—';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
-export const fmtDate = (d) =>
-  new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+export const fmtDate = (d) => {
+  if (!d) return '—';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 export const fmtDateTime = (d) => `${fmtDate(d)} · ${fmtTime(d)}`;
 

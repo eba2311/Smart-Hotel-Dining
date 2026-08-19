@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import {
-  Mail, Lock, Eye, EyeOff, LogIn, Loader2, UserCog, ChefHat, BellRing, ShieldCheck,
+  Mail, Lock, Eye, EyeOff, LogIn, Loader2, UserCog, ChefHat, BellRing, ShieldCheck, Moon, Sun, Globe,
 } from 'lucide-react';
 
 const ROLE_HOME = { admin: '/admin', manager: '/manager', waiter: '/waiter', kitchen: '/kitchen' };
@@ -19,6 +21,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { lang, toggle } = useLanguage();
+  const { dark, toggle: toggleTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
@@ -55,7 +59,7 @@ export default function LoginPage() {
     if (!email.trim()) next.email = 'Email is required';
     else if (!EMAIL_RE.test(email.trim())) next.email = 'Enter a valid email address';
     if (!password) next.password = 'Password is required';
-    else if (password.length < 6) next.password = 'Password must be at least 6 characters';
+    else if (password.length < 8) next.password = 'Password must be at least 8 characters';
     setErrors(next);
     if (Object.keys(next).length) return;
     await doLogin(email.trim(), password);
@@ -85,6 +89,25 @@ export default function LoginPage() {
             Smart Hotel Dining
           </h1>
           <p className="text-neutral-400 text-sm mt-1">Ordering &amp; Service Management System</p>
+        </div>
+
+        {/* Theme and Language Toggles */}
+        <div className="flex justify-center gap-3 mb-6">
+          <button
+            onClick={toggle}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
+            title="Toggle Language"
+          >
+            <Globe size={16} />
+            <span className="text-sm font-medium">{lang === 'en' ? 'EN' : 'AM'}</span>
+          </button>
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
+            title="Toggle Theme"
+          >
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
         </div>
 
         {/* Card */}

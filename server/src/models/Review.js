@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const aspectSchema = new mongoose.Schema(
   {
     aspect: { type: String },
+    label: { type: String },
     sentiment: { type: String, enum: ['positive', 'negative', 'neutral'] },
     score: { type: Number, default: 0 },
     keywords: { type: [String], default: [] },

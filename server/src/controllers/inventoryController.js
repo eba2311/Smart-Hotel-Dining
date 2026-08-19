@@ -17,25 +17,39 @@ export const createIngredient = asyncHandler(async (req, res) => {
 });
 
 export const updateIngredient = asyncHandler(async (req, res) => {
-  const ing = await Ingredient.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const { name, unit, stock, lowStockThreshold, costPerUnit, active } = req.body;
+  const ing = await Ingredient.findByIdAndUpdate(req.params.id, { name, unit, stock, lowStockThreshold, costPerUnit, active }, { new: true, runValidators: true });
   if (!ing) throw new AppError('Ingredient not found', 404);
   res.json({ success: true, data: ing });
 });
 
 export const deleteIngredient = asyncHandler(async (req, res) => {
-  await Ingredient.findByIdAndDelete(req.params.id);
+  const ing = await Ingredient.findByIdAndDelete(req.params.id);
+  if (!ing) throw new AppError('Ingredient not found', 404);
   res.json({ success: true, message: 'Ingredient deleted' });
 });
 
 export const restockIngredient = asyncHandler(async (req, res) => {
-  const { quantity } = req.body;
-  const ing = await inventoryService.restock(req.params.branchId || req.body.branch, req.params.id, quantity, req.user);
+  const { quantity, branch } = req.body;
+  let branchId = branch;
+  if (!branchId) {
+    const existing = await Ingredient.findById(req.params.id).select('branch');
+    if (existing) branchId = existing.branch;
+  }
+  if (!branchId) throw new AppError('Branch is required', 400);
+  const ing = await inventoryService.restock(branchId, req.params.id, quantity, req.user);
   res.json({ success: true, data: ing });
 });
 
 export const adjustIngredient = asyncHandler(async (req, res) => {
-  const { stock } = req.body;
-  const ing = await inventoryService.adjust(req.params.branchId || req.body.branch, req.params.id, stock, req.user);
+  const { stock, branch } = req.body;
+  let branchId = branch;
+  if (!branchId) {
+    const existing = await Ingredient.findById(req.params.id).select('branch');
+    if (existing) branchId = existing.branch;
+  }
+  if (!branchId) throw new AppError('Branch is required', 400);
+  const ing = await inventoryService.adjust(branchId, req.params.id, stock, req.user);
   res.json({ success: true, data: ing });
 });
 

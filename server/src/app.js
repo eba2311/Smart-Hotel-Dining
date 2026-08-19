@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import mongoose from 'mongoose';
 
 import authRoutes from './routes/authRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
@@ -46,7 +47,15 @@ if (config.nodeEnv === 'development') app.use(morgan('dev'));
 
 app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
-app.get('/api/health', (req, res) => res.json({ success: true, message: 'Smart Hotel API is running' }));
+app.get('/api/health', (req, res) => {
+  const dbReady = mongoose.connection.readyState === 1;
+  const status = dbReady ? 200 : 503;
+  res.status(status).json({
+    success: dbReady,
+    message: dbReady ? 'Smart Hotel API is running' : 'Database not connected',
+    db: dbReady ? 'connected' : 'disconnected',
+  });
+});
 
 app.use('/api', apiLimiter);
 app.use('/api/auth', authRoutes);

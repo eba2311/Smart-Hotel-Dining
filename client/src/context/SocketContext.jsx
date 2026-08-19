@@ -1,23 +1,35 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import { useAuth } from './AuthContext.jsx';
 
 const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const { socketReconnect } = useAuth();
 
   useEffect(() => {
     const token = localStorage.getItem('sh_token');
-    const socket = io({ auth: { token } });
-    socketRef.current = socket;
-    socket.on('connect', () => setConnected(true));
-    socket.on('disconnect', () => setConnected(false));
-    return () => socket.disconnect();
-  }, []);
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+    }
+    const s = io({ auth: { token } });
+    socketRef.current = s;
+    s.on('connect', () => { setConnected(true); setSocket(s); });
+    s.on('disconnect', () => setConnected(false));
+    return () => {
+      s.removeAllListeners();
+      s.disconnect();
+      setSocket(null);
+      setConnected(false);
+    };
+  }, [socketReconnect]);
 
-  const joinOrder = useCallback((orderId) => {
-    socketRef.current?.emit('join-order', orderId);
+  const joinOrder = useCallback((orderId, customerId) => {
+    socketRef.current?.emit('join-order', orderId, customerId);
   }, []);
 
   const leaveOrder = useCallback((orderId) => {
@@ -28,13 +40,19 @@ export function SocketProvider({ children }) {
     socketRef.current?.emit('join-branch', branchId);
   }, []);
 
+  const leaveBranch = useCallback((branchId) => {
+    socketRef.current?.emit('leave-branch', branchId);
+  }, []);
+
   const on = useCallback((event, cb) => {
-    socketRef.current?.on(event, cb);
-    return () => socketRef.current?.off(event, cb);
+    const socket = socketRef.current;
+    if (!socket) return () => {};
+    socket.on(event, cb);
+    return () => { socket.off(event, cb); };
   }, []);
 
   return (
-    <SocketContext.Provider value={{ socket: socketRef.current, connected, joinOrder, leaveOrder, joinBranch, on }}>
+    <SocketContext.Provider value={{ socket, connected, joinOrder, leaveOrder, joinBranch, leaveBranch, on }}>
       {children}
     </SocketContext.Provider>
   );

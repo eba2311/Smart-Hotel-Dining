@@ -1,0 +1,42 @@
+{
+  "name": "Smart Hotel Dining",
+  "short_name": "SmartHotel",
+  "description": "AI-enhanced QR-based smart hotel dining, ordering and service management system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["food", "travel", "business"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Scan QR",
+      "short_name": "Scan",
+      "description": "Scan a QR code to order",
+      "url": "/menu/scan",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Orders",
+      "short_name": "Orders",
+      "description": "View your order history",
+      "url": "/history/me",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

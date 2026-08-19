@@ -11,11 +11,16 @@ export function useBranch() {
   });
 
   useEffect(() => {
-    adminApi.branches().then((res) => setBranches(res.data)).catch(() => {});
-  }, []);
+    if (!user) return;
+    adminApi.branches(user.hotel || undefined).then((res) => setBranches(res.data || [])).catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     if (!branch && branches.length > 0) {
+      const b = branches[0];
+      localStorage.setItem('sh_branch', b._id);
+      setBranchState(b._id);
+    } else if (branch && branches.length > 0 && !branches.find((b) => b._id === branch)) {
       const b = branches[0];
       localStorage.setItem('sh_branch', b._id);
       setBranchState(b._id);

@@ -4,9 +4,10 @@
  *   CREATED → PAYMENT_PENDING → CONFIRMED → KITCHEN_ACCEPTED → PREPARING
  *     → READY → OUT_FOR_DELIVERY → DELIVERED → COMPLETED
  *
- * Cancellation is only allowed from CREATED, PAYMENT_PENDING and CONFIRMED.
+ * Cancellation is only allowed from CREATED, PAYMENT_PENDING, CONFIRMED and KITCHEN_ACCEPTED.
  */
 import { ORDER_FLOW, CANCELLABLE_FROM } from '../../constants.js';
+import { AppError } from '../../utils/AppError.js';
 
 export const transitionMap = {
   CREATED: ['PAYMENT_PENDING', 'CONFIRMED', 'CANCELLED'],
@@ -32,7 +33,7 @@ export const nextSteps = (status) => transitionMap[status] || [];
 
 export function validateTransition(from, to) {
   if (!canTransition(from, to)) {
-    const err = new Error(`INVALID_TRANSITION`);
+    const err = new AppError(`Cannot transition from ${from} to ${to}`, 400);
     err.details = { from, to };
     throw err;
   }

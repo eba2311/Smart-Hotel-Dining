@@ -7,7 +7,7 @@ import { OrderStatusBadge } from '../components/StatusBadge.jsx';
 import DishImage from '../components/DishImage.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { clsx } from 'clsx';
-import { Bell, Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 
 const ACTIVE = ['CONFIRMED', 'KITCHEN_ACCEPTED', 'PREPARING', 'READY'];
 
@@ -57,9 +57,69 @@ function playNotif() {
   } catch {}
 }
 
+function Ticket({ o, busy, onAct }) {
+  const action = ACTIONS[o.status];
+  const mins = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 60000);
+  const urgent = mins > 15 && o.status !== 'READY';
+  const warning = mins > 10 && o.status !== 'READY';
+
+  return (
+    <div className={clsx('card p-4 border-l-4 transition-all', STATUS_BORDER[o.status], STATUS_BG[o.status], urgent && 'ring-2 ring-rose-300 animate-pulse')}>
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="font-bold text-lg">{o.orderNumber}</p>
+            {(urgent || warning) && (
+              <span className={clsx('badge text-[10px]', urgent ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700')}>
+                ⏰ {elapsed(o.createdAt)}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-500">
+            {o.table ? `Table ${o.table?.number}` : o.room ? `Room ${o.room?.number}` : 'Takeaway'}
+            {o.customerName && o.customerName !== 'Guest' && <span className="text-slate-400"> · {o.customerName}</span>}
+          </p>
+        </div>
+        <OrderStatusBadge status={o.status} />
+      </div>
+      <div className="space-y-2 mb-3">
+        {(o.items || []).map((it, i) => (
+          <div key={i} className="flex items-start gap-2 text-sm">
+            <DishImage src={it.image} alt={it.name} size="w-8 h-8" textSize="text-sm" className="shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <span className="font-medium">{it.name}</span>
+              <span className="font-bold ml-1">×{it.quantity}</span>
+              {it.options?.length > 0 && (
+                <span className="block text-xs text-slate-400">
+                  {it.options.map((op) => `${op.name}: ${op.choices.map((c) => c.label).join(', ')}`).join(' · ')}
+                </span>
+              )}
+              {it.note && <span className="block text-xs text-amber-600 font-medium">📝 {it.note}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+      {action && (
+        <button
+          onClick={() => onAct(o, action.action)}
+          disabled={busy === o._id}
+          className={clsx('w-full py-3 rounded-xl text-white font-bold text-sm disabled:opacity-50 transition-all shadow-lg active:scale-[0.98]', action.color)}
+        >
+          {busy === o._id ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Working...
+            </span>
+          ) : action.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function KitchenDashboard() {
   const { user } = useAuth();
-  const { joinBranch, on, socket } = useSocket();
+  const { on, socket } = useSocket();
   const toast = useToast();
   const [orders, setOrders] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -134,66 +194,6 @@ export default function KitchenDashboard() {
   if (!branchId) return <Empty title="No branch assigned" subtitle="Contact an administrator to assign you to a branch." />;
   if (!orders) return <Spinner label="Loading kitchen orders..." />;
 
-  const Ticket = ({ o }) => {
-    const action = ACTIONS[o.status];
-    const mins = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 60000);
-    const urgent = mins > 15 && o.status !== 'READY';
-    const warning = mins > 10 && o.status !== 'READY';
-
-    return (
-      <div className={clsx('card p-4 border-l-4 transition-all', STATUS_BORDER[o.status], STATUS_BG[o.status], urgent && 'ring-2 ring-rose-300 animate-pulse')}>
-        <div className="flex items-start justify-between mb-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="font-bold text-lg">{o.orderNumber}</p>
-              {(urgent || warning) && (
-                <span className={clsx('badge text-[10px]', urgent ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700')}>
-                  ⏰ {elapsed(o.createdAt)}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-slate-500">
-              {o.table ? `Table ${o.table?.number}` : o.room ? `Room ${o.room?.number}` : 'Takeaway'}
-              {o.customerName && o.customerName !== 'Guest' && <span className="text-slate-400"> · {o.customerName}</span>}
-            </p>
-          </div>
-          <OrderStatusBadge status={o.status} />
-        </div>
-        <div className="space-y-2 mb-3">
-          {o.items.map((it, i) => (
-            <div key={i} className="flex items-start gap-2 text-sm">
-              <DishImage src={it.image} alt={it.name} size="w-8 h-8" textSize="text-sm" className="shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <span className="font-medium">{it.name}</span>
-                <span className="font-bold ml-1">×{it.quantity}</span>
-                {it.options?.length > 0 && (
-                  <span className="block text-xs text-slate-400">
-                    {it.options.map((op) => `${op.name}: ${op.choices.map((c) => c.label).join(', ')}`).join(' · ')}
-                  </span>
-                )}
-                {it.note && <span className="block text-xs text-amber-600 font-medium">📝 {it.note}</span>}
-              </div>
-            </div>
-          ))}
-        </div>
-        {action && (
-          <button
-            onClick={() => act(o, action.action)}
-            disabled={busy === o._id}
-            className={clsx('w-full py-3 rounded-xl text-white font-bold text-sm disabled:opacity-50 transition-all shadow-lg active:scale-[0.98]', action.color)}
-          >
-            {busy === o._id ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Working...
-              </span>
-            ) : action.label}
-          </button>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-6">
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
@@ -223,8 +223,8 @@ export default function KitchenDashboard() {
         <Empty icon="🍳" title="Kitchen is clear" subtitle="New orders will appear here in real time." />
       ) : (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {sortBy(cooking).map((o) => <Ticket key={o._id} o={o} />)}
-          {sortBy(ready).map((o) => <Ticket key={o._id} o={o} />)}
+          {sortBy(cooking).map((o) => <Ticket key={o._id} o={o} busy={busy} onAct={act} />)}
+          {sortBy(ready).map((o) => <Ticket key={o._id} o={o} busy={busy} onAct={act} />)}
         </div>
       )}
     </div>

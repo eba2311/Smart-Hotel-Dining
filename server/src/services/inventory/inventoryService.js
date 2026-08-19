@@ -10,6 +10,7 @@ import Ingredient from '../../models/Ingredient.js';
 import MenuItem from '../../models/MenuItem.js';
 import InventoryTransaction from '../../models/InventoryTransaction.js';
 import { notificationService } from '../notifications/notificationService.js';
+import { AppError } from '../../utils/AppError.js';
 
 export const inventoryService = {
   async consumeIngredientsForOrder(order) {
@@ -27,12 +28,28 @@ export const inventoryService = {
       }
     }
 
+    const deductions = [];
     const lowStockIds = [];
+    const ingIds = [...usage.keys()];
+    const ingredients = await Ingredient.find({ _id: { $in: ingIds } });
+    const ingMap = new Map(ingredients.map((i) => [String(i._id), i]));
+
     for (const [ingId, qty] of usage.entries()) {
-      const ing = await Ingredient.findById(ingId);
+      const ing = ingMap.get(ingId);
+      if (!ing || ing.stock < qty) {
+        if (ing) lowStockIds.push(ing._id);
+        continue;
+      }
+      deductions.push({ ingId, qty });
+    }
+
+    for (const { ingId, qty } of deductions) {
+      const ing = await Ingredient.findOneAndUpdate(
+        { _id: ingId, stock: { $gte: qty } },
+        { $inc: { stock: -qty } },
+        { new: true }
+      );
       if (!ing) continue;
-      ing.stock = Math.max(0, ing.stock - qty);
-      await ing.save();
       await InventoryTransaction.create({
         branch: order.branch,
         ingredient: ing._id,
@@ -59,7 +76,7 @@ export const inventoryService = {
   async syncAvailability(branchId) {
     const ingredients = await Ingredient.find({ branch: branchId });
     const byId = new Map(ingredients.map((i) => [String(i._id), i]));
-    const items = await MenuItem.find({ branch: branchId, available: true }).populate('category');
+    const items = await MenuItem.find({ branch: branchId }).populate('category');
 
     for (const item of items) {
       let ok = true;
@@ -73,13 +90,16 @@ export const inventoryService = {
       if (!ok && item.available) {
         item.available = false;
         await item.save();
+      } else if (ok && !item.available) {
+        item.available = true;
+        await item.save();
       }
     }
   },
 
   async restock(branchId, ingredientId, quantity, user, reason = 'Restock') {
     const ing = await Ingredient.findOne({ _id: ingredientId, branch: branchId });
-    if (!ing) throw new Error('INGREDIENT_NOT_FOUND');
+    if (!ing) throw new AppError('Ingredient not found', 404);
     ing.stock += quantity;
     await ing.save();
     await InventoryTransaction.create({
@@ -96,7 +116,7 @@ export const inventoryService = {
 
   async adjust(branchId, ingredientId, newStock, user, reason = 'Manual adjustment') {
     const ing = await Ingredient.findOne({ _id: ingredientId, branch: branchId });
-    if (!ing) throw new Error('INGREDIENT_NOT_FOUND');
+    if (!ing) throw new AppError('Ingredient not found', 404);
     const delta = newStock - ing.stock;
     ing.stock = Math.max(0, newStock);
     await ing.save();
@@ -110,5 +130,36 @@ export const inventoryService = {
     });
     await this.syncAvailability(branchId);
     return ing;
+  },
+
+  async restoreIngredientsForOrder(order) {
+    const itemIds = order.items.map((i) => i.menuItem).filter(Boolean);
+    const menuItems = await MenuItem.find({ _id: { $in: itemIds } }).select('ingredientLinks');
+
+    const usage = new Map();
+    for (const mi of menuItems) {
+      const qtyOrdered = order.items.find((o) => String(o.menuItem) === String(mi._id))?.quantity || 0;
+      for (const link of mi.ingredientLinks || []) {
+        if (!link.ingredient) continue;
+        const key = String(link.ingredient);
+        usage.set(key, (usage.get(key) || 0) + link.quantity * qtyOrdered);
+      }
+    }
+
+    for (const [ingId, qty] of usage.entries()) {
+      const ing = await Ingredient.findByIdAndUpdate(ingId, { $inc: { stock: qty } }, { new: true });
+      if (!ing) continue;
+      await InventoryTransaction.create({
+        branch: order.branch,
+        ingredient: ing._id,
+        type: 'in',
+        quantity: qty,
+        reason: `Refund for order ${order.orderNumber}`,
+        refModel: 'Order',
+        refId: order._id,
+      });
+    }
+
+    await this.syncAvailability(order.branch);
   },
 };

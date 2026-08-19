@@ -16,7 +16,7 @@ import DishImage from '../../components/DishImage.jsx';
 
 export default function DashboardPage() {
   const { branch, branches, setBranch } = useBranch();
-  const { on } = useSocket();
+  const { on, socket } = useSocket();
   const [data, setData] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
@@ -28,6 +28,11 @@ export default function DashboardPage() {
     if (!branch) return;
     analyticsApi.summary(branch).then((res) => { setData(res.data); setLastUpdated(Date.now()); }).catch(() => setData(null));
   }, [branch]);
+
+  useEffect(() => {
+    if (!branch || !socket) return;
+    socket.emit('join-branch', branch);
+  }, [branch, socket]);
 
   useEffect(() => {
     if (!on) return;
@@ -43,6 +48,7 @@ export default function DashboardPage() {
   }, [branch]);
 
   const statusTotals = (statusMap) => {
+    if (!statusMap) return [];
     const keys = ['CREATED', 'CONFIRMED', 'KITCHEN_ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'CANCELLED'];
     return keys.filter((k) => (statusMap[k] || 0) > 0).map((k) => ({ name: k, count: statusMap[k] }));
   };
@@ -65,15 +71,15 @@ export default function DashboardPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={<Banknote size={22} />} label="Today's Sales" value={fmtMoney(data.todaySales)} sub={`Last 7 days: ${fmtMoney(data.last7Sales)}`} color="bg-emerald-50 text-emerald-600" />
             <StatCard icon={<ClipboardList size={22} />} label="Orders Today" value={data.todayOrders} sub={`Active: ${data.activeOrders}`} color="bg-sky-50 text-sky-600" />
-            <StatCard icon={<Star size={22} />} label="Avg Rating" value={data.satisfaction.avg ? `${data.satisfaction.avg.toFixed(1)} / 5` : '—'} sub={`${data.satisfaction.count} reviews`} color="bg-amber-50 text-amber-600" />
-            <StatCard icon={<PackageX size={22} />} label="Out of Stock" value={data.lowStock.length} sub="ingredients need restock" color="bg-rose-50 text-rose-600" />
+            <StatCard icon={<Star size={22} />} label="Avg Rating" value={data.satisfaction?.avg ? `${data.satisfaction.avg.toFixed(1)} / 5` : '—'} sub={`${data.satisfaction?.count || 0} reviews`} color="bg-amber-50 text-amber-600" />
+            <StatCard icon={<PackageX size={22} />} label="Out of Stock" value={(data.lowStock || []).length} sub="ingredients need restock" color="bg-rose-50 text-rose-600" />
           </div>
 
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="card p-5 lg:col-span-2">
               <p className="font-bold mb-4 flex items-center gap-2"><TrendingUp size={16} /> Revenue (last 7 days)</p>
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={data.revenueByDay.map((d) => ({ name: d._id, revenue: d.total }))}>
+                <LineChart data={(data.revenueByDay || []).map((d) => ({ name: d._id, revenue: d.total }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
@@ -106,11 +112,11 @@ export default function DashboardPage() {
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="card p-5">
               <p className="font-bold mb-4">Popular Items (7 days)</p>
-              {data.popularItems.length === 0 ? (
+              {(data.popularItems || []).length === 0 ? (
                 <Empty title="No data" />
               ) : (
                 <div className="space-y-3">
-                  {data.popularItems.map((p, i) => (
+                  {(data.popularItems || []).map((p, i) => (
                     <div key={p._id} className="flex items-center gap-3">
                       <span className="w-6 text-center font-bold text-slate-400">{i + 1}</span>
                       <DishImage src={p.image} alt={p._id} size="w-12 h-12" textSize="text-2xl" />
@@ -125,7 +131,7 @@ export default function DashboardPage() {
             <div className="card p-5">
               <p className="font-bold mb-4">Peak Hours (30 days)</p>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={data.peakHours.map((h) => ({ name: `${h._id}:00`, orders: h.count }))}>
+                <BarChart data={(data.peakHours || []).map((h) => ({ name: `${h._id}:00`, orders: h.count }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={2} />
                   <YAxis tick={{ fontSize: 11 }} />
@@ -137,11 +143,11 @@ export default function DashboardPage() {
 
             <div className="card p-5">
               <p className="font-bold mb-4 flex items-center gap-2 text-rose-600"><Sparkles size={16} /> Low Stock Alerts</p>
-              {data.lowStock.length === 0 ? (
+              {(data.lowStock || []).length === 0 ? (
                 <Empty icon="✅" title="All good" subtitle="No ingredients are out of stock." />
               ) : (
                 <div className="space-y-3">
-                  {data.lowStock.slice(0, 8).map((i) => (
+                  {(data.lowStock || []).slice(0, 8).map((i) => (
                     <div key={i._id} className="flex items-center justify-between">
                       <div className="flex-1">
                         <p className="text-sm font-medium">{i.name}</p>

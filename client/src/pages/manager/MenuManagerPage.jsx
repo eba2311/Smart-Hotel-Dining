@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, UploadCloud, Image as ImageIcon, X, Search } from 'lucide-react';
-import { catalogApi, uploadApi } from '../../lib/api.js';
+import { catalogApi, uploadApi, inventoryApi } from '../../lib/api.js';
 import DashboardLayout from '../../components/DashboardLayout.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
 import { Button, Modal, Input, Select, Textarea, Badge, Spinner, Empty } from '../../components/ui.jsx';
@@ -41,6 +41,7 @@ export default function MenuManagerPage() {
         canvas.width = width;
         canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(img.src);
         resolve(canvas.toDataURL('image/jpeg', 0.8));
       };
       img.onerror = () => reject(new Error('Could not read that image file'));
@@ -68,6 +69,8 @@ export default function MenuManagerPage() {
     if (!branch) return;
     Promise.all([catalogApi.all(branch), catalogApi.categories(branch)]).then(([itemsRes, catRes]) => {
       setData({ items: itemsRes.data, categories: catRes.data });
+    }).catch(() => {
+      setData({ items: [], categories: [] });
     });
   };
 
@@ -79,9 +82,7 @@ export default function MenuManagerPage() {
 
   useEffect(() => {
     if (!branch) return;
-    import('../../lib/api.js').then(({ inventoryApi }) =>
-      inventoryApi.list(branch).then((res) => setIngredients(res.data)).catch(() => {})
-    );
+    inventoryApi.list(branch).then((res) => setIngredients(res.data)).catch(() => {});
   }, [branch]);
 
   const saveItem = async () => {
@@ -120,9 +121,11 @@ export default function MenuManagerPage() {
 
   const deleteItem = async (item) => {
     if (!confirm(`Delete ${item.name}?`)) return;
-    await catalogApi.deleteItem(item._id);
-    toast.success('Item deleted');
-    load();
+    try {
+      await catalogApi.deleteItem(item._id);
+      toast.success('Item deleted');
+      load();
+    } catch (e) { toast.error(e.message || 'Failed to delete item'); }
   };
 
   const deleteCat = async (c) => {

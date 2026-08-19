@@ -14,4 +14,7 @@ const inventoryTransactionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+inventoryTransactionSchema.index({ branch: 1, createdAt: -1 });
+inventoryTransactionSchema.index({ ingredient: 1 });
+
 export default mongoose.model('InventoryTransaction', inventoryTransactionSchema);

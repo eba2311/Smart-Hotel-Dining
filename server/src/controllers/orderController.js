@@ -17,7 +17,7 @@ const buildServerItems = (menuItems, lineItems) =>
     if (!item) throw new AppError(`Menu item not found: ${line.menuItem}`, 400);
     if (!item.available) throw new AppError(`${item.name} is currently unavailable`, 400);
 
-    let unitPrice = item.price;
+    let unitPrice = (item.promotionPrice && item.promotionPrice < item.price) ? item.promotionPrice : item.price;
     const optionDetails = [];
     for (const sel of line.options || []) {
       const opt = item.options.find((o) => String(o.id) === String(sel.optionId));
@@ -44,13 +44,12 @@ const buildServerItems = (menuItems, lineItems) =>
       options: optionDetails,
       note: line.note || '',
       subtotal: round2(unitPrice * line.quantity),
-      prepTimeMinutes: item.prepTimeMinutes,
-      ingredients: item.ingredients,
+      prepTimeMinutes: item.prepTimeMinutes || 0,
     };
   });
 
 export const createOrder = asyncHandler(async (req, res) => {
-  const { branch, table, room, customerId, customerName, items, couponCode, paymentMethod, source, note } = req.body;
+  const { branch, table, room, customerId, customerName, items, couponCode, paymentMethod, source, note, tip, idempotencyKey } = req.body;
 
   if (!Array.isArray(items) || items.length === 0) {
     throw new AppError('Order must contain at least one item', 400);
@@ -62,47 +61,60 @@ export const createOrder = asyncHandler(async (req, res) => {
   const serverItems = buildServerItems(menuItems, items);
   let coupon = null;
   if (couponCode) {
-    coupon = await Coupon.findOne({ code: couponCode, branch, active: true });
-    if (!coupon || (coupon.expiresAt && coupon.expiresAt < new Date()) || coupon.usedCount >= coupon.maxUses) {
+    const upperCode = String(couponCode).toUpperCase();
+    const updated = await Coupon.findOneAndUpdate(
+      { code: upperCode, branch, active: true, $expr: { $lt: ['$usedCount', '$maxUses'] }, $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gte: new Date() } }] },
+      { $inc: { usedCount: 1 } },
+      { new: true }
+    );
+    if (!updated) {
       throw new AppError('Invalid or expired coupon', 400);
     }
-    if (serverItems.reduce((s, i) => s + i.subtotal, 0) < coupon.minOrder) {
-      throw new AppError(`Coupon requires a minimum order of ${coupon.minOrder}`, 400);
+    if (serverItems.reduce((s, i) => s + i.subtotal, 0) < updated.minOrder) {
+      await Coupon.findOneAndUpdate({ code: upperCode, branch }, { $inc: { usedCount: -1 } });
+      throw new AppError(`Coupon requires a minimum order of ${updated.minOrder}`, 400);
     }
-    coupon.usedCount += 1;
-    await coupon.save();
+    coupon = updated;
   }
 
-  const totals = await orderService.computeTotals(serverItems, coupon);
+  const totals = orderService.computeTotals(serverItems, coupon, tip);
 
-  const order = await orderService.createOrder({
-    branch,
-    table,
-    room,
-    customerId,
-    customerName,
-    items: serverItems,
-    source,
-    note,
-  });
-
-  order.subtotal = totals.subtotal;
-  order.discount = totals.discount;
-  order.couponCode = coupon?.code || '';
-  order.tax = totals.tax;
-  order.total = totals.total;
-  await order.save();
-
-  const emitted = await Order.findById(order._id)
-    .populate('table', 'number label')
-    .populate('room', 'number');
-  notificationService.branch(branch, 'order:new', emitted);
-  if (customerId) notificationService.guest(customerId, 'order:created', emitted);
+  let order;
+  try {
+    order = await orderService.createOrder({
+      branch,
+      table,
+      room,
+      customerId,
+      customerName,
+      items: serverItems,
+      source,
+      note,
+      idempotencyKey,
+      totals,
+      paymentMethod,
+      couponCode: coupon?.code || '',
+    });
+  } catch (err) {
+    if (coupon) {
+      await Coupon.findOneAndUpdate({ code: coupon.code, branch }, { $inc: { usedCount: -1 } }).catch(() => {});
+    }
+    if (err.code === 11000 && idempotencyKey) {
+      const existing = await Order.findOne({ idempotencyKey });
+      if (existing) return res.status(200).json({ success: true, data: { order: existing, payment: null, duplicate: true } });
+    }
+    throw err;
+  }
 
   if (paymentMethod === 'cash') {
     const { order: confirmed } = await orderService.confirmOrder(order, customerName || 'Guest');
     if (table) await Table.findByIdAndUpdate(table, { status: 'occupied' });
     if (room) await Room.findByIdAndUpdate(room, { status: 'occupied' });
+    const emitted = await Order.findById(order._id)
+      .populate('table', 'number label')
+      .populate('room', 'number');
+    notificationService.branch(branch, 'order:new', emitted);
+    if (customerId) notificationService.guest(customerId, 'order:created', emitted);
     return res.status(201).json({ success: true, data: { order: confirmed, payment: null } });
   }
 
@@ -110,16 +122,18 @@ export const createOrder = asyncHandler(async (req, res) => {
   await orderService.transition(order, 'PAYMENT_PENDING', customerName || 'Guest');
   const result = await paymentService.processPayment(order, paymentMethod, order.total);
   if (!result.success) {
-    order.status = 'CANCELLED';
-    order.cancelledReason = `Payment failed: ${result.reason || 'Gateway declined'}`;
-    order.statusHistory.push({ status: 'CANCELLED', by: 'system', note: result.reason, at: new Date() });
-    await order.save();
+    await orderService.cancelOrder(order, 'system', `Payment failed: ${result.reason || 'Gateway declined'}`);
     throw new AppError(result.reason || 'Payment failed', 402);
   }
 
   const { order: confirmed } = await orderService.confirmOrder(order, 'payment');
   if (table) await Table.findByIdAndUpdate(table, { status: 'occupied' });
   if (room) await Room.findByIdAndUpdate(room, { status: 'occupied' });
+  const emitted = await Order.findById(order._id)
+    .populate('table', 'number label')
+    .populate('room', 'number');
+  notificationService.branch(branch, 'order:new', emitted);
+  if (customerId) notificationService.guest(customerId, 'order:created', emitted);
 
   res.status(201).json({ success: true, data: { order: confirmed, payment: result.payment } });
 });
@@ -134,13 +148,13 @@ export const getOrder = asyncHandler(async (req, res) => {
 
 export const listOrders = asyncHandler(async (req, res) => {
   const { branch, status, limit = 50 } = req.query;
-  const filter = { branch };
+  const filter = branch ? { branch } : {};
   if (status) filter.status = status;
   const orders = await Order.find(filter)
     .populate('table', 'number label')
     .populate('room', 'number')
     .sort({ createdAt: -1 })
-    .limit(parseInt(limit, 10));
+    .limit(Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200));
   res.json({ success: true, data: orders });
 });
 
@@ -163,10 +177,20 @@ export const updateStatus = asyncHandler(async (req, res) => {
     throw new AppError(`Cannot move order from ${order.status} to ${to}`, 400);
   }
   await orderService.transition(order, to, req.user?.name || 'staff', note || '');
-  if (to === 'COMPLETED') {
-    if (order.table) await Table.findByIdAndUpdate(order.table, { status: 'available' });
+  if (to === 'COMPLETED' || to === 'CANCELLED') {
+    if (order.table) {
+      const otherActive = await Order.countDocuments({ table: order.table, status: { $in: ['CREATED', 'CONFIRMED', 'KITCHEN_ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] }, _id: { $ne: order._id } });
+      if (otherActive === 0) await Table.findByIdAndUpdate(order.table, { status: 'available' });
+    }
+    if (order.room) {
+      const otherActive = await Order.countDocuments({ room: order.room, status: { $in: ['CREATED', 'CONFIRMED', 'KITCHEN_ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] }, _id: { $ne: order._id } });
+      if (otherActive === 0) await Room.findByIdAndUpdate(order.room, { status: 'vacant' });
+    }
   }
-  res.json({ success: true, data: order });
+  const populated = await Order.findById(order._id)
+    .populate('table', 'number label')
+    .populate('room', 'number');
+  res.json({ success: true, data: populated });
 });
 
 export const kitchenAction = asyncHandler(async (req, res) => {
@@ -181,9 +205,14 @@ export const cancelOrder = asyncHandler(async (req, res) => {
   const { reason } = req.body;
   const order = await Order.findById(id);
   if (!order) throw new AppError('Order not found', 404);
+  if (req.user?.role === 'guest') {
+    const callerId = String(req.user._id);
+    if (order.customerId && order.customerId !== callerId) {
+      throw new AppError('You can only cancel your own orders', 403);
+    }
+  }
   const by = req.user?.name || order.customerName || 'Guest';
-  const result = await orderService.cancelOrder(order, by, reason || 'Cancelled by customer');
-  if (order.table) await Table.findByIdAndUpdate(order.table, { status: 'available' });
+  const result = await orderService.cancelOrder(order, by, reason || 'Cancelled');
   res.json({ success: true, data: result });
 });
 
@@ -193,5 +222,79 @@ export const waiterDeliver = asyncHandler(async (req, res) => {
   if (!order) throw new AppError('Order not found', 404);
   if (order.status !== 'READY') throw new AppError('Order is not ready for delivery', 400);
   await orderService.transition(order, 'OUT_FOR_DELIVERY', req.user?.name || 'waiter');
-  res.json({ success: true, data: order });
+  const populated = await Order.findById(order._id)
+    .populate('table', 'number label')
+    .populate('room', 'number');
+  res.json({ success: true, data: populated });
+});
+
+export const guestLoyalty = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+  const stats = await Order.aggregate([
+    { $match: { customerId, status: { $ne: 'CANCELLED' } } },
+    { $group: {
+      _id: null,
+      totalOrders: { $sum: 1 },
+      totalSpent: { $sum: '$total' },
+      totalItems: { $sum: { $size: '$items' } },
+      avgOrderValue: { $avg: '$total' },
+      firstOrder: { $min: '$createdAt' },
+      lastOrder: { $max: '$createdAt' },
+    }},
+  ]);
+  const s = stats[0] || { totalOrders: 0, totalSpent: 0, totalItems: 0, avgOrderValue: 0 };
+  const points = Math.floor((s.totalSpent || 0) / 100);
+  const tier = points >= 500 ? 'Platinum' : points >= 200 ? 'Gold' : points >= 50 ? 'Silver' : 'Bronze';
+  res.json({ success: true, data: {
+    totalOrders: s.totalOrders,
+    totalSpent: s.totalSpent || 0,
+    totalItems: s.totalItems || 0,
+    avgOrderValue: Math.round(s.avgOrderValue || 0),
+    points,
+    tier,
+    firstOrder: s.firstOrder,
+    lastOrder: s.lastOrder,
+  }});
+});
+
+export const smartEta = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const order = await Order.findById(id);
+  if (!order) throw new AppError('Order not found', 404);
+
+  const avgTimes = await Order.aggregate([
+    { $match: { branch: order.branch, status: 'COMPLETED' } },
+    { $project: {
+      prepMs: { $subtract: ['$updatedAt', '$createdAt'] },
+      itemCount: { $size: '$items' },
+    }},
+    { $group: {
+      _id: null,
+      avgPrepMs: { $avg: '$prepMs' },
+      avgItemCount: { $avg: '$itemCount' },
+      count: { $sum: 1 },
+    }},
+  ]);
+
+  const avg = avgTimes[0] || { avgPrepMs: 15 * 60 * 1000, avgItemCount: 3 };
+  const baseMinutes = Math.round((avg.avgPrepMs || 15 * 60 * 1000) / 60000);
+  const itemCountFactor = (order.items.length / (avg.avgItemCount || 3));
+  const estimatedMinutes = Math.max(5, Math.round(baseMinutes * Math.max(0.6, itemCountFactor)));
+
+  const pendingCount = await Order.countDocuments({
+    branch: order.branch,
+    status: { $in: ['CONFIRMED', 'KITCHEN_ACCEPTED', 'PREPARING'] },
+    createdAt: { $lt: order.createdAt },
+  });
+
+  const queueWait = pendingCount * 3;
+  const totalEta = estimatedMinutes + queueWait;
+
+  res.json({ success: true, data: {
+    estimatedMinutes: totalEta,
+    basePrepMinutes: estimatedMinutes,
+    queuePosition: pendingCount,
+    queueWaitMinutes: queueWait,
+    historicalOrders: avg.count || 0,
+  }});
 });

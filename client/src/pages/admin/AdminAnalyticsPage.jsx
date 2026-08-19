@@ -20,6 +20,9 @@ export default function AdminAnalyticsPage() {
     adminApi.hotels().then((res) => {
       setHotels(res.data);
       if (res.data.length > 0) setSelectedHotel(res.data[0]._id);
+    }).catch(() => {
+      setHotels([]);
+      setLoading(false);
     });
   }, []);
 
@@ -29,7 +32,7 @@ export default function AdminAnalyticsPage() {
     adminApi.branches(selectedHotel).then((res) => {
       setBranches(res.data);
       const promises = res.data.map((b) =>
-        analyticsApi.summary(b._id).then((r) => ({ branchId: b._id, branchName: b.name, ...r.data })).catch(() => null)
+        analyticsApi.summary(b._id).then((r) => ({ branchId: b._id, branchName: b.name, ...(r.data || {}) })).catch(() => null)
       );
       Promise.all(promises).then((results) => {
         const map = {};
@@ -37,6 +40,9 @@ export default function AdminAnalyticsPage() {
         setBranchData(map);
         setLoading(false);
       });
+    }).catch(() => {
+      setBranches([]);
+      setLoading(false);
     });
   }, [selectedHotel]);
 
@@ -86,7 +92,7 @@ export default function AdminAnalyticsPage() {
               icon={<Star size={20} />}
               label="Avg. Rating"
               value={overallRating}
-              sub={avgRating.length > 0 ? `From ${avgRating.length} branches` : 'No ratings yet'}
+              sub={branchesWithRating.length > 0 ? `From ${branchesWithRating.length} branches` : 'No ratings yet'}
               color="bg-amber-50 text-amber-700"
             />
             <StatCard

@@ -58,8 +58,9 @@ export const KITCHEN_STATUS = {
   ACCEPTED: 'accepted',
   PREPARING: 'preparing',
   READY: 'ready',
+  CANCELLED: 'cancelled',
 };
 
 export const TABLE_STATUS = ['available', 'occupied', 'reserved'];
 
-export const CANCELLABLE_FROM = ['CREATED', 'PAYMENT_PENDING', 'CONFIRMED'];
+export const CANCELLABLE_FROM = ['CREATED', 'PAYMENT_PENDING', 'CONFIRMED', 'KITCHEN_ACCEPTED'];

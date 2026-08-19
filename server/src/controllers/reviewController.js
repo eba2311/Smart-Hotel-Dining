@@ -27,11 +27,7 @@ export const createReview = asyncHandler(async (req, res) => {
   });
 
   order.rating = rating;
-  if (order.status === 'COMPLETED') await order.save();
-  else {
-    order.rating = rating;
-    await order.save();
-  }
+  await order.save();
 
   res.status(201).json({ success: true, data: review });
 });
@@ -46,4 +42,25 @@ export const listReviews = asyncHandler(async (req, res) => {
 export const analyzeReview = asyncHandler(async (req, res) => {
   const { comment } = req.body;
   res.json({ success: true, data: analyzeFeedback(comment) });
+});
+
+export const quickRating = asyncHandler(async (req, res) => {
+  const { order: orderId, branch, quickRating: rating } = req.body;
+  if (!orderId || !branch || !rating) throw new AppError('order, branch, and quickRating are required', 400);
+  const exists = await Review.findOne({ order: orderId });
+  if (exists) return res.json({ success: true, data: { alreadyReviewed: true } });
+  const order = await Order.findById(orderId);
+  if (!order) throw new AppError('Order not found', 404);
+  const review = await Review.create({
+    order: orderId,
+    branch,
+    customerId: order?.customerId || 'guest',
+    customerName: order?.customerName || 'Guest',
+    rating,
+    comment: rating >= 4 ? 'Quick positive rating' : 'Quick negative rating',
+    sentiment: { overall: rating >= 4 ? 'positive' : 'negative', aspects: [], summary: '' },
+    analyzed: true,
+  });
+  if (order) { order.rating = rating; await order.save(); }
+  res.status(201).json({ success: true, data: review });
 });

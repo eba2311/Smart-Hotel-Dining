@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { User, Mail, Shield, Phone, Lock, Save, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { authApi } from '../lib/api.js';
 import { Button, Input } from '../components/ui.jsx';
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: user?.name || '',
@@ -29,40 +30,53 @@ export default function ProfilePage() {
     if (role === 'manager') return '/manager';
     if (role === 'kitchen') return '/kitchen';
     if (role === 'waiter') return '/waiter';
-    return '/login';
+    return '/';
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    setMsg('');
+    try {
+      const res = await authApi.updateProfile({ name: form.name, phone: form.phone });
+      updateUser(res.data);
+      localStorage.setItem('sh_user', JSON.stringify(res.data));
       setMsg('Profile updated successfully');
       setTimeout(() => setMsg(''), 3000);
-    }, 800);
+    } catch (err) {
+      setMsg(err.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     if (passwords.new !== passwords.confirm) {
       setMsg('Passwords do not match');
       return;
     }
-    if (passwords.new.length < 6) {
-      setMsg('Password must be at least 6 characters');
+    if (passwords.new.length < 8) {
+      setMsg('Password must be at least 8 characters');
       return;
     }
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    setMsg('');
+    try {
+      const res = await authApi.changePassword({ currentPassword: passwords.current, newPassword: passwords.new });
+      if (res.token) localStorage.setItem('sh_token', res.token);
       setMsg('Password changed successfully');
       setPasswords({ current: '', new: '', confirm: '' });
       setTimeout(() => setMsg(''), 3000);
-    }, 800);
+    } catch (err) {
+      setMsg(err.message || 'Failed to change password');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-neutral-950">
       <div className="bg-gradient-to-r from-black via-neutral-950 to-brand-950 text-white">
         <div className="max-w-3xl mx-auto px-6 py-6">
           <button
@@ -157,7 +171,7 @@ export default function ProfilePage() {
                 onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
               />
             </div>
-            <p className="text-xs text-slate-400">Password must be at least 6 characters</p>
+            <p className="text-xs text-slate-400">Password must be at least 8 characters</p>
             <div className="flex justify-end">
               <Button type="submit" variant="outline">
                 <Lock size={16} /> Change Password

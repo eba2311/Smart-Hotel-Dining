@@ -11,8 +11,11 @@ export const listStaff = asyncHandler(async (req, res) => {
 
 export const createStaff = asyncHandler(async (req, res) => {
   const { name, email, password, role, hotel, branch, phone } = req.body;
-  if (!['manager', 'waiter', 'kitchen'].includes(role)) {
-    throw new AppError('Invalid staff role', 400);
+  const assignable = req.user.role === 'admin'
+    ? ['admin', 'manager', 'waiter', 'kitchen']
+    : ['manager', 'waiter', 'kitchen'];
+  if (!assignable.includes(role)) {
+    throw new AppError('You cannot assign this role', 403);
   }
   const user = await User.create({ name, email, password, role, hotel, branch, phone });
   res.status(201).json({ success: true, data: user.toSafeJSON() });
@@ -24,7 +27,13 @@ export const updateStaff = asyncHandler(async (req, res) => {
   const { name, phone, role, branch, active, password } = req.body;
   if (name) user.name = name;
   if (phone !== undefined) user.phone = phone;
-  if (role) user.role = role;
+  if (role) {
+    const assignable = req.user.role === 'admin'
+      ? ['admin', 'manager', 'waiter', 'kitchen']
+      : ['manager', 'waiter', 'kitchen'];
+    if (!assignable.includes(role)) throw new AppError('You cannot assign this role', 403);
+    user.role = role;
+  }
   if (branch !== undefined) user.branch = branch;
   if (active !== undefined) user.active = active;
   if (password) user.password = password;

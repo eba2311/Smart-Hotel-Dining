@@ -2,20 +2,23 @@ import React from 'react';
 import { clsx } from 'clsx';
 import { X, Loader2 } from 'lucide-react';
 
-export function Button({ variant = 'primary', loading, children, className, ...props }) {
+export function Button({ variant = 'primary', loading, children, className, disabled, ...props }) {
   return (
-    <button className={clsx(`btn-${variant}`, className)} disabled={loading || props.disabled} {...props}>
+    <button className={clsx(`btn-${variant}`, className)} disabled={loading || disabled} {...props}>
       {loading && <Loader2 size={16} className="animate-spin" />}
       {children}
     </button>
   );
 }
 
-export function Input({ label, error, className, ...props }) {
+export function Input({ label, error, icon, className, ...props }) {
   return (
     <div className="space-y-1">
       {label && <label className="label">{label}</label>}
-      <input className={clsx('input', error && 'border-rose-400', className)} {...props} />
+      <div className="relative">
+        {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">{icon}</span>}
+        <input className={clsx('input', error && 'border-rose-400', icon && 'pl-9', className)} {...props} />
+      </div>
       {error && <p className="text-xs text-rose-500">{error}</p>}
     </div>
   );

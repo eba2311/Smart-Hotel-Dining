@@ -4,6 +4,7 @@ import { couponApi } from '../../lib/api.js';
 import DashboardLayout from '../../components/DashboardLayout.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
 import { Button, Modal, Input, Select, Spinner, Empty, Badge } from '../../components/ui.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
 import { fmtDate, fmtMoney } from '../../lib/format.js';
 
 const emptyForm = {
@@ -23,6 +24,7 @@ export default function CouponManagerPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState('all');
+  const toast = useToast();
 
   const load = () => {
     if (!branch) return;
@@ -52,7 +54,7 @@ export default function CouponManagerPage() {
       setForm({ ...emptyForm });
       load();
     } catch (e) {
-      alert(e.message);
+      toast.error(e.message);
     } finally {
       setSaving(false);
     }
@@ -63,14 +65,14 @@ export default function CouponManagerPage() {
     try {
       await couponApi.remove(c._id);
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message); }
   };
 
   const toggleActive = async (c) => {
     try {
       await couponApi.update(c._id, { active: !c.active });
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message); }
   };
 
   const openEdit = (c) => {
@@ -92,7 +94,12 @@ export default function CouponManagerPage() {
     setShowForm(true);
   };
 
-  const isExpired = (c) => c.expiresAt && new Date(c.expiresAt) < new Date();
+  const isExpired = (c) => {
+    if (!c.expiresAt) return false;
+    const exp = new Date(c.expiresAt);
+    exp.setHours(23, 59, 59, 999);
+    return exp < new Date();
+  };
   const isUsedUp = (c) => c.maxUses > 0 && c.usedCount >= c.maxUses;
 
   const filtered = coupons

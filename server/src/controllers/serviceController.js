@@ -9,14 +9,17 @@ export const createServiceRequest = asyncHandler(async (req, res) => {
     ...req.body,
     status: SERVICE_STATUS.PENDING,
   });
-  notificationService.branch(req.body.branch, 'service:new', request);
-  if (req.body.guestName) notificationService.guest(req.body.customerId, 'service:created', request);
-  res.status(201).json({ success: true, data: request });
+  const populated = await ServiceRequest.findById(request._id)
+    .populate('room', 'number')
+    .populate('table', 'number label');
+  notificationService.branch(req.body.branch, 'service:new', populated);
+  if (req.body.guestName) notificationService.guest(req.body.customerId, 'service:created', populated);
+  res.status(201).json({ success: true, data: populated });
 });
 
 export const listServiceRequests = asyncHandler(async (req, res) => {
   const { branch, status } = req.query;
-  const filter = { branch };
+  const filter = branch ? { branch } : {};
   if (status) filter.status = status;
   const requests = await ServiceRequest.find(filter)
     .populate('room', 'number')
@@ -30,16 +33,24 @@ export const updateServiceRequest = asyncHandler(async (req, res) => {
   const request = await ServiceRequest.findById(id);
   if (!request) throw new AppError('Service request not found', 404);
 
-  const valid = ['accepted', 'processing', 'completed', 'cancelled'];
-  if (req.body.status && !valid.includes(req.body.status)) {
+  const { status, assignedTo, priority, note } = req.body;
+  if (status && !Object.values(SERVICE_STATUS).includes(status)) {
     throw new AppError('Invalid status', 400);
   }
 
-  if (req.body.status === 'accepted') request.assignedTo = req.user?._id;
-  if (req.body.status === 'completed') request.resolvedAt = new Date();
+  if (status) request.status = status;
+  if (status === 'accepted' && assignedTo === undefined) {
+    request.assignedTo = req.user?._id;
+  }
+  if (status === 'completed') request.resolvedAt = new Date();
+  if (assignedTo !== undefined) request.assignedTo = assignedTo;
+  if (priority !== undefined) request.priority = priority;
+  if (note !== undefined) request.note = note;
 
-  Object.assign(request, req.body);
   await request.save();
-  notificationService.branch(request.branch, 'service:update', request);
-  res.json({ success: true, data: request });
+  const populated = await ServiceRequest.findById(request._id)
+    .populate('room', 'number')
+    .populate('table', 'number label');
+  notificationService.branch(request.branch, 'service:update', populated);
+  res.json({ success: true, data: populated });
 });

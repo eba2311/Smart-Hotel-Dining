@@ -32,10 +32,10 @@ export async function predictDemand({ branch, date = new Date(), save = true }) 
 
   for (const o of orders) {
     if (new Date(o.createdAt).getDay() !== targetDow) continue;
-    const ageWeeks = Math.max(1, (Date.now() - new Date(o.createdAt).getTime()) / (7 * 24 * 3600 * 1000));
+    const ageWeeks = Math.max(1, (new Date(date).getTime() - new Date(o.createdAt).getTime()) / (7 * 24 * 3600 * 1000));
     const recencyWeight = 1 / Math.min(ageWeeks, 4);
     for (const it of o.items) {
-      const key = String(it.menuItem || it.name);
+      const key = String(it.menuItem || it.name || `unknown_${Math.random()}`);
       const entry = perItem.get(key) || { count: 0, weight: 0, name: it.name, itemId: it.menuItem };
       entry.count += it.quantity;
       entry.weight += recencyWeight;
@@ -81,5 +81,5 @@ export async function predictDemand({ branch, date = new Date(), save = true }) 
     );
   }
 
-  return { forecastFor, dow: DOW[targetDow], note, items, forecast };
+  return { forecastFor, dow: DOW[targetDow], note, items, forecast: forecast || null };
 }

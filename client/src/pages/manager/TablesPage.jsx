@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, QrCode, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { Plus, QrCode, Copy, RefreshCw, Trash2, Pencil } from 'lucide-react';
 import { tableApi } from '../../lib/api.js';
 import DashboardLayout from '../../components/DashboardLayout.jsx';
 import { useBranch } from '../../hooks/useBranch.js';
@@ -17,6 +17,8 @@ export default function TablesPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ number: '', seats: 2, floor: 1, roomType: 'Standard' });
   const [qrTarget, setQrTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState({ number: '', seats: 2, floor: 1, roomType: 'Standard' });
 
   const load = () => {
     if (!branch) return;

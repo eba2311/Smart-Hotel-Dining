@@ -1,11 +1,10 @@
 import { z } from 'zod';
-import { ROLES } from '../constants.js';
+import { ROLES, TABLE_STATUS } from '../constants.js';
 
 export const registerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(ROLES).optional(),
   hotel: z.string().optional(),
   branch: z.string().optional(),
 });
@@ -70,7 +69,7 @@ export const createTableSchema = z.object({
   number: z.string().min(1),
   label: z.string().optional(),
   seats: z.number().optional(),
-  status: z.string().optional(),
+  status: z.enum(TABLE_STATUS).optional(),
 });
 
 export const createRoomSchema = z.object({
@@ -78,7 +77,7 @@ export const createRoomSchema = z.object({
   number: z.string().min(1),
   floor: z.number().optional(),
   roomType: z.string().optional(),
-  status: z.string().optional(),
+  status: z.enum(['vacant', 'occupied']).optional(),
 });
 
 export const createOrderSchema = z.object({
@@ -87,10 +86,12 @@ export const createOrderSchema = z.object({
   room: z.string().optional(),
   customerId: z.string().optional(),
   customerName: z.string().optional(),
-  source: z.string().optional(),
+  source: z.enum(['qr', 'counter', 'room']).optional(),
   note: z.string().optional(),
   couponCode: z.string().optional(),
   paymentMethod: z.enum(['card', 'mobile_money', 'bank', 'cash']).default('cash'),
+  tip: z.number().min(0).optional(),
+  idempotencyKey: z.string().optional(),
   items: z
     .array(
       z.object({
@@ -121,6 +122,7 @@ export const kitchenActionSchema = z.object({
 
 export const cancelOrderSchema = z.object({
   reason: z.string().optional(),
+  guestId: z.string().optional(),
 });
 
 export const createServiceSchema = z.object({
@@ -131,6 +133,7 @@ export const createServiceSchema = z.object({
   customerId: z.string().optional(),
   type: z.enum(['housekeeping', 'towels', 'cleaning', 'maintenance', 'water', 'room_service', 'reception']),
   note: z.string().optional(),
+  priority: z.number().optional(),
 });
 
 export const updateServiceSchema = z
@@ -147,7 +150,7 @@ export const createReviewSchema = z.object({
   customerId: z.string().optional(),
   customerName: z.string().optional(),
   rating: z.number().int().min(1).max(5),
-  comment: z.string().optional(),
+  comment: z.string().max(2000).optional(),
 });
 
 export const createIngredientSchema = z.object({
@@ -213,9 +216,88 @@ export const createCouponSchema = z.object({
   value: z.number().positive(),
   minOrder: z.number().default(0),
   maxUses: z.number().default(100),
-  expiresAt: z.string().optional(),
+  expiresAt: z.coerce.date().optional(),
 });
 
 export const analyzeSchema = z.object({
   comment: z.string().default(''),
+});
+
+export const updateProfileSchema = z.object({
+  name: z.string().min(2).optional(),
+  phone: z.string().optional(),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+export const validateCouponSchema = z.object({
+  code: z.string().min(1),
+  branch: z.string().min(1),
+  subtotal: z.number().min(0),
+});
+
+export const updateTableSchema = z.object({
+  number: z.string().optional(),
+  label: z.string().optional(),
+  seats: z.number().optional(),
+  status: z.enum(TABLE_STATUS).optional(),
+  active: z.boolean().optional(),
+}).partial();
+
+export const updateRoomSchema = z.object({
+  number: z.string().optional(),
+  floor: z.number().optional(),
+  roomType: z.string().optional(),
+  status: z.enum(['vacant', 'occupied']).optional(),
+  active: z.boolean().optional(),
+}).partial();
+
+export const updateIngredientSchema = z.object({
+  name: z.string().optional(),
+  unit: z.string().optional(),
+  stock: z.number().optional(),
+  lowStockThreshold: z.number().optional(),
+  costPerUnit: z.number().optional(),
+  active: z.boolean().optional(),
+}).partial();
+
+export const updateHotelSchema = z.object({
+  name: z.string().optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  logo: z.string().optional(),
+  currency: z.string().optional(),
+}).partial();
+
+export const updateBranchSchema = z.object({
+  name: z.string().optional(),
+  type: z.enum(['restaurant', 'bar', 'room_service']).optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  active: z.boolean().optional(),
+}).partial();
+
+export const updateCouponSchema = z.object({
+  code: z.string().optional(),
+  type: z.enum(['percent', 'fixed']).optional(),
+  value: z.number().optional(),
+  minOrder: z.number().optional(),
+  maxUses: z.number().optional(),
+  expiresAt: z.coerce.date().optional(),
+  active: z.boolean().optional(),
+}).partial();
+
+export const quickRatingSchema = z.object({
+  order: z.string().min(1),
+  branch: z.string().min(1),
+  quickRating: z.number().int().min(1).max(5),
+});
+
+export const bulkAvailabilitySchema = z.object({
+  branch: z.string().min(1),
+  available: z.boolean(),
 });

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { config } from './config/env.js';
 import { connectDb } from './config/db.js';
 import { randomToken } from './utils/helpers.js';
+import { ORDER_STATUS, PAYMENT_STATUS, SERVICE_STATUS } from './constants.js';
 
 import User from './models/User.js';
 import Hotel from './models/Hotel.js';
@@ -327,15 +328,206 @@ const seed = async () => {
     expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
   });
 
+  // ── Guest users ──────────────────────────────────────────────
+  const guests = [];
+  const guestDefs = [
+    { name: 'Abebe Kebede', email: 'abebe@guest.com' },
+    { name: 'Fatima Hassan', email: 'fatima@guest.com' },
+    { name: 'John Smith', email: 'john@guest.com' },
+    { name: 'Hiwot Tesfaye', email: 'hiwot@guest.com' },
+  ];
+  for (const g of guestDefs) {
+    guests.push(await User.create({
+      name: g.name,
+      email: g.email,
+      password: 'Guest@123',
+      role: 'guest',
+      hotel: hotel._id,
+    }));
+  }
+
+  // ── Staff for room service branch ────────────────────────────
+  await User.create({
+    name: 'Room Waiter',
+    email: 'roomwaiter@hotel.com',
+    password: 'Waiter@123',
+    role: 'waiter',
+    hotel: hotel._id,
+    branch: roomService._id,
+  });
+  await User.create({
+    name: 'Room Kitchen',
+    email: 'roomkitchen@hotel.com',
+    password: 'Kitchen@123',
+    role: 'kitchen',
+    hotel: hotel._id,
+    branch: roomService._id,
+  });
+
+  // ── Helper to build order items ──────────────────────────────
+  const allMenuItems = await MenuItem.find({ branch: restaurant._id });
+  const itemByName = new Map(allMenuItems.map((m) => [m.name, m]));
+
+  function pickItems(count) {
+    const picks = [];
+    const names = [...itemByName.keys()];
+    for (let i = 0; i < count; i++) {
+      const name = names[Math.floor(Math.random() * names.length)];
+      const item = itemByName.get(name);
+      picks.push({
+        menuItem: item._id,
+        name: item.name,
+        image: item.image,
+        quantity: 1 + Math.floor(Math.random() * 3),
+        unitPrice: item.price,
+        subtotal: item.price,
+      });
+    }
+    return picks;
+  }
+
+  // ── Seed orders (past 14 days) ──────────────────────────────
+  const statuses = Object.values(ORDER_STATUS).filter((s) => s !== 'CANCELLED');
+  const now = Date.now();
+  const orders = [];
+
+  for (let day = 0; day < 14; day++) {
+    const ordersPerDay = 3 + Math.floor(Math.random() * 5);
+    for (let j = 0; j < ordersPerDay; j++) {
+      const items = pickItems(1 + Math.floor(Math.random() * 3));
+      const subtotal = items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0);
+      const taxRate = 0.15;
+      const tax = Math.round(subtotal * taxRate * 100) / 100;
+      const total = subtotal + tax;
+      const createdAt = new Date(now - day * 24 * 3600 * 1000 - Math.floor(Math.random() * 86400000));
+      const useTable = Math.random() > 0.4;
+      const targetTable = useTable ? tables[Math.floor(Math.random() * tables.length)] : null;
+      const status = statuses[Math.floor(Math.random() * statuses.length)];
+
+      const order = await Order.create({
+        branch: restaurant._id,
+        table: targetTable?._id,
+        customerId: guests[Math.floor(Math.random() * guests.length)]._id,
+        customerName: guests[Math.floor(Math.random() * guests.length)].name,
+        source: useTable ? 'qr' : 'counter',
+        status,
+        items,
+        subtotal,
+        tax,
+        tip: Math.round(Math.random() * 50),
+        total: total + Math.round(Math.random() * 50),
+        note: j % 3 === 0 ? 'Please deliver quickly' : undefined,
+        estimatedMinutes: Math.max(...items.map((it) => 15 + Math.floor(Math.random() * 15))),
+        createdAt,
+        updatedAt: createdAt,
+      });
+
+      // Update table status for active orders
+      if (useTable && ['CREATED', 'PAYMENT_PENDING', 'CONFIRMED', 'KITCHEN_ACCEPTED', 'PREPARING', 'READY'].includes(status)) {
+        await Table.findByIdAndUpdate(targetTable._id, { status: 'occupied' });
+      }
+
+      // ── Payment for completed/paid orders ────────────────────
+      if (['COMPLETED', 'DELIVERED', 'OUT_FOR_DELIVERY', 'READY'].includes(status)) {
+        await Payment.create({
+          order: order._id,
+          branch: restaurant._id,
+          amount: order.total,
+          method: ['cash', 'card', 'mobile_money', 'bank'][Math.floor(Math.random() * 4)],
+          status: PAYMENT_STATUS.PAID,
+          createdAt,
+        });
+      }
+
+      // ── Kitchen ticket for orders in kitchen pipeline ─────────
+      if (['KITCHEN_ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'].includes(status)) {
+        const kitchenStatus = status === 'KITCHEN_ACCEPTED' ? 'accepted'
+          : status === 'PREPARING' ? 'preparing'
+          : 'ready';
+        await KitchenTicket.create({
+          order: order._id,
+          branch: restaurant._id,
+          status: kitchenStatus,
+          items: items.map((it) => ({ menuItem: it.menuItem, quantity: it.quantity, note: it.note })),
+          createdAt,
+          updatedAt: createdAt,
+        });
+      }
+
+      // ── Review for completed orders ──────────────────────────
+      if (status === 'COMPLETED' && Math.random() > 0.3) {
+        const rating = 3 + Math.floor(Math.random() * 3);
+        const comments = [
+          'Excellent food and great service!',
+          'The pasta was delicious.',
+          'Good value for money.',
+          'Service was a bit slow but food was great.',
+          'Amazing experience, will come back!',
+          'Food was okay, nothing special.',
+          'Loved the steak, perfectly cooked.',
+          'The coffee was outstanding.',
+        ];
+        await Review.create({
+          order: order._id,
+          branch: restaurant._id,
+          customerId: order.customerId,
+          customerName: order.customerName,
+          rating,
+          comment: comments[Math.floor(Math.random() * comments.length)],
+          sentiment: rating >= 4 ? 'positive' : rating === 3 ? 'neutral' : 'negative',
+          createdAt,
+        });
+      }
+
+      orders.push(order);
+    }
+  }
+
+  // ── Service requests ─────────────────────────────────────────
+  const serviceTypes = ['housekeeping', 'towels', 'cleaning', 'maintenance', 'water', 'room_service', 'reception'];
+  for (let i = 0; i < 8; i++) {
+    const useRoom = Math.random() > 0.5;
+    await ServiceRequest.create({
+      branch: restaurant._id,
+      room: useRoom ? rooms[Math.floor(Math.random() * rooms.length)]._id : undefined,
+      table: !useRoom ? tables[Math.floor(Math.random() * tables.length)]._id : undefined,
+      guestName: guests[Math.floor(Math.random() * guests.length)].name,
+      customerId: guests[Math.floor(Math.random() * guests.length)]._id,
+      type: serviceTypes[Math.floor(Math.random() * serviceTypes.length)],
+      status: Object.values(SERVICE_STATUS)[Math.floor(Math.random() * 5)],
+      note: 'Please come as soon as possible',
+      createdAt: new Date(now - Math.floor(Math.random() * 7 * 24 * 3600 * 1000)),
+    });
+  }
+
+  // ── Audit logs ───────────────────────────────────────────────
+  const actions = ['login', 'create_order', 'update_menu', 'update_status', 'restock'];
+  const methods = ['POST', 'PUT', 'GET', 'DELETE'];
+  for (let i = 0; i < 20; i++) {
+    const action = actions[Math.floor(Math.random() * actions.length)];
+    await AuditLog.create({
+      user: manager._id,
+      action,
+      method: methods[Math.floor(Math.random() * methods.length)],
+      path: `/api/${action.replace('_', '/')}`,
+      ip: '127.0.0.1',
+      createdAt: new Date(now - Math.floor(Math.random() * 14 * 24 * 3600 * 1000)),
+    });
+  }
+
   console.log('✅ Seed complete');
   console.log('──────────────────────────────────────────────');
-  console.log('  Admin   → admin@hotel.com / Admin@123');
-  console.log('  Manager → manager@hotel.com / Manager@123');
-  console.log('  Waiter  → waiter@hotel.com / Waiter@123');
-  console.log('  Kitchen → kitchen@hotel.com / Kitchen@123');
-  console.log(`  Coupon  → WELCOME10 (10% off over 300 ETB)`);
+  console.log('  Admin     → admin@hotel.com / Admin@123');
+  console.log('  Manager   → manager@hotel.com / Manager@123');
+  console.log('  Waiter    → waiter@hotel.com / Waiter@123');
+  console.log('  Kitchen   → kitchen@hotel.com / Kitchen@123');
+  console.log('  Guest 1   → abebe@guest.com / Guest@123');
+  console.log('  Guest 2   → fatima@guest.com / Guest@123');
+  console.log(`  Coupon    → WELCOME10 (10% off over 300 ETB)`);
   console.log('──────────────────────────────────────────────');
   console.log(`  Tables: ${tables.length} | Rooms: ${rooms.length} | Menu items: ${itemDefs.length}`);
+  console.log(`  Orders: ${orders.length} | Reviews: ${Math.floor(orders.length * 0.7)}`);
+  await mongoose.disconnect();
   process.exit(0);
 };
 

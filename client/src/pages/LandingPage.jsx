@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QrCode, Utensils, Star, Wifi, ArrowRight, ChevronRight } from 'lucide-react';
+import { QrCode, Utensils, Star, Wifi, ArrowRight, ChevronRight, Moon, Sun, Globe } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 const features = [
   {
@@ -28,6 +30,8 @@ const features = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const [qrInput, setQrInput] = useState('');
+  const { lang, toggle } = useLanguage();
+  const { dark, toggle: toggleTheme } = useTheme();
 
   const handleQrSubmit = (e) => {
     e.preventDefault();
@@ -47,12 +51,29 @@ export default function LandingPage() {
             <p className="text-xs text-brand-400">Dining & Service</p>
           </div>
         </div>
-        <button
-          onClick={() => navigate('/login')}
-          className="btn-outline !border-white/20 !text-white hover:!bg-white/10"
-        >
-          Staff Login
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggle}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
+            title="Toggle Language"
+          >
+            <Globe size={16} />
+            <span className="text-sm font-medium">{lang === 'en' ? 'EN' : 'AM'}</span>
+          </button>
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
+            title="Toggle Theme"
+          >
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="btn-outline !border-white/20 !text-white hover:!bg-white/10"
+          >
+            Staff Login
+          </button>
+        </div>
       </nav>
 
       <section className="max-w-7xl mx-auto px-6 pt-16 pb-24 md:pt-24 md:pb-32">
@@ -170,7 +191,7 @@ export default function LandingPage() {
             <span className="text-lg">🏨</span>
             <span>Smart Hotel Dining & Service</span>
           </div>
-          <p>&copy; {new Date().getFullYear()} Grand Palace Hotel. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Smart Hotel. All rights reserved.</p>
         </div>
       </footer>
     </div>

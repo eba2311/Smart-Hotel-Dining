@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Hotel as HotelIcon, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { Plus, MapPin, Trash2, Pencil } from 'lucide-react';
 import { adminApi } from '../../lib/api.js';
 import DashboardLayout from '../../components/DashboardLayout.jsx';
 import { Button, Modal, Input, Select, Spinner, Empty, Badge } from '../../components/ui.jsx';
@@ -11,6 +11,8 @@ export default function AdminHomePage() {
   const [branches, setBranches] = useState(null);
   const [showHotel, setShowHotel] = useState(false);
   const [showBranch, setShowBranch] = useState(false);
+  const [editHotel, setEditHotel] = useState(null);
+  const [editBranch, setEditBranch] = useState(null);
   const [hotelForm, setHotelForm] = useState({ name: '', address: '', phone: '', email: '', logo: '🏨' });
   const [branchForm, setBranchForm] = useState({ hotel: '', name: '', type: 'restaurant', address: '', phone: '' });
   const [saving, setSaving] = useState(false);
@@ -46,7 +48,7 @@ export default function AdminHomePage() {
       setBranchForm({ hotel: '', name: '', type: 'restaurant', address: '', phone: '' });
       load();
     } catch (e) {
-      toast.error(e.message || 'Failed to create hotel');
+      toast.error(e.message || 'Failed to create branch');
     } finally {
       setSaving(false);
     }
@@ -71,6 +73,44 @@ export default function AdminHomePage() {
       load();
     } catch (e) {
       toast.error(e.message || 'Failed to delete');
+    }
+  };
+
+  const openEditHotel = (h) => {
+    setEditHotel(h);
+    setHotelForm({ name: h.name, address: h.address || '', phone: h.phone || '', email: h.email || '', logo: h.logo || '🏨' });
+  };
+
+  const openEditBranch = (b) => {
+    setEditBranch(b);
+    setBranchForm({ hotel: b.hotel?._id || b.hotel, name: b.name, type: b.type || 'restaurant', address: b.address || '', phone: b.phone || '' });
+  };
+
+  const saveEditHotel = async () => {
+    setSaving(true);
+    try {
+      await adminApi.updateHotel(editHotel._id, hotelForm);
+      toast.success('Hotel updated');
+      setEditHotel(null);
+      load();
+    } catch (e) {
+      toast.error(e.message || 'Failed to update hotel');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveEditBranch = async () => {
+    setSaving(true);
+    try {
+      await adminApi.updateBranch(editBranch._id, branchForm);
+      toast.success('Branch updated');
+      setEditBranch(null);
+      load();
+    } catch (e) {
+      toast.error(e.message || 'Failed to update branch');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -100,7 +140,8 @@ export default function AdminHomePage() {
                     <p className="font-bold text-lg">{h.name}</p>
                     <p className="text-sm text-slate-500 flex items-center gap-1"><MapPin size={13} /> {h.address || 'No address'}</p>
                   </div>
-                  <Badge className="bg-slate-100 text-slate-600">{hb.length} branches</Badge>
+                  <Badge className="bg-slate-100 dark:bg-neutral-800 dark:text-neutral-300 text-slate-600">{hb.length} branches</Badge>
+                  <button onClick={() => openEditHotel(h)} className="text-slate-400 hover:text-brand-500 transition-colors" title="Edit hotel"><Pencil size={16} /></button>
                   <button onClick={() => removeHotel(h)} className="text-slate-400 hover:text-red-500 transition-colors" title="Delete hotel"><Trash2 size={16} /></button>
                 </div>
                 {hb.length === 0 ? (
@@ -112,7 +153,8 @@ export default function AdminHomePage() {
                         <div className="flex items-center justify-between">
                           <p className="font-semibold">{b.name}</p>
                           <div className="flex items-center gap-2">
-                            <Badge className="bg-brand-50 text-brand-700">{b.type.replace('_', ' ')}</Badge>
+                            <Badge className="bg-brand-50 dark:bg-brand-500/20 dark:text-brand-400 text-brand-700">{b.type.replace('_', ' ')}</Badge>
+                            <button onClick={() => openEditBranch(b)} className="text-slate-400 hover:text-brand-500 transition-colors" title="Edit branch"><Pencil size={14} /></button>
                             <button onClick={() => removeBranch(b)} className="text-slate-400 hover:text-red-500 transition-colors" title="Delete branch"><Trash2 size={14} /></button>
                           </div>
                         </div>
@@ -153,6 +195,35 @@ export default function AdminHomePage() {
           <Input label="Address" value={branchForm.address} onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })} />
           <Input label="Phone" value={branchForm.phone} onChange={(e) => setBranchForm({ ...branchForm, phone: e.target.value })} />
           <Button className="w-full" onClick={saveBranch} disabled={saving}>{saving ? 'Creating...' : 'Create Branch'}</Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!editHotel} onClose={() => setEditHotel(null)} title="Edit Hotel">
+        <div className="space-y-4">
+          <Input label="Hotel name" value={hotelForm.name} onChange={(e) => setHotelForm({ ...hotelForm, name: e.target.value })} />
+          <Input label="Logo (emoji)" value={hotelForm.logo} onChange={(e) => setHotelForm({ ...hotelForm, logo: e.target.value })} />
+          <Input label="Address" value={hotelForm.address} onChange={(e) => setHotelForm({ ...hotelForm, address: e.target.value })} />
+          <Input label="Phone" value={hotelForm.phone} onChange={(e) => setHotelForm({ ...hotelForm, phone: e.target.value })} />
+          <Input label="Email" value={hotelForm.email} onChange={(e) => setHotelForm({ ...hotelForm, email: e.target.value })} />
+          <Button className="w-full" onClick={saveEditHotel} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!editBranch} onClose={() => setEditBranch(null)} title="Edit Branch">
+        <div className="space-y-4">
+          <Select label="Hotel" value={branchForm.hotel} onChange={(e) => setBranchForm({ ...branchForm, hotel: e.target.value })}>
+            <option value="">Select...</option>
+            {hotels.map((h) => <option key={h._id} value={h._id}>{h.name}</option>)}
+          </Select>
+          <Input label="Branch name" value={branchForm.name} onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })} />
+          <Select label="Type" value={branchForm.type} onChange={(e) => setBranchForm({ ...branchForm, type: e.target.value })}>
+            <option value="restaurant">Restaurant</option>
+            <option value="bar">Bar</option>
+            <option value="room_service">Room Service</option>
+          </Select>
+          <Input label="Address" value={branchForm.address} onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })} />
+          <Input label="Phone" value={branchForm.phone} onChange={(e) => setBranchForm({ ...branchForm, phone: e.target.value })} />
+          <Button className="w-full" onClick={saveEditBranch} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
         </div>
       </Modal>
     </DashboardLayout>

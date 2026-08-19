@@ -22,13 +22,13 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (!branch) return;
     setRevenue(null); setSatisfaction(null); setDemand(null);
-    analyticsApi.revenue(branch, days).then((res) => setRevenue(res.data));
-    analyticsApi.satisfaction(branch).then((res) => setSatisfaction(res.data));
-    analyticsApi.demand(branch).then((res) => setDemand(res.data));
+    analyticsApi.revenue(branch, days).then((res) => setRevenue(res.data)).catch(() => setRevenue(null));
+    analyticsApi.satisfaction(branch).then((res) => setSatisfaction(res.data)).catch(() => setSatisfaction(null));
+    analyticsApi.demand(branch).then((res) => setDemand(res.data)).catch(() => setDemand(null));
   }, [branch, days]);
 
   const aspectData = satisfaction
-    ? Object.entries(satisfaction.aspectScores)
+    ? Object.entries(satisfaction.aspectScores || {})
         .filter(([, v]) => v !== null)
         .map(([k, v]) => ({ aspect: k.replace('foodQuality', 'Food Quality').replace('service', 'Service').replace('speed', 'Speed').replace('price', 'Value').replace('menu', 'Menu'), score: v }))
     : [];
@@ -42,7 +42,7 @@ export default function AnalyticsPage() {
             <option value="">Select branch...</option>
             {branches.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
           </Select>
-          <Select value={days} onChange={(e) => setDays(e.target.value)} className="w-28">
+          <Select value={days} onChange={(e) => setDays(Number(e.target.value))} className="w-28">
             {[7, 14, 30].map((d) => <option key={d} value={d}>{d} days</option>)}
           </Select>
         </div>
@@ -94,7 +94,7 @@ export default function AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {demand.items.map((it) => (
+                  {(demand.items || []).map((it) => (
                     <tr key={it.itemId || it.name} className="border-b border-slate-50">
                       <td className="px-4 py-2 font-medium">{it.name}</td>
                       <td className="px-4 py-2">
@@ -117,7 +117,7 @@ export default function AnalyticsPage() {
           <p className="font-bold mb-4">Satisfaction Distribution</p>
           {satisfaction ? (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={Object.entries(satisfaction.distribution).map(([k, v]) => ({ name: k, count: v }))}>
+              <BarChart data={Object.entries(satisfaction.distribution || {}).map(([k, v]) => ({ name: k, count: v }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />

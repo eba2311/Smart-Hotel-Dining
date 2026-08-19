@@ -3,11 +3,12 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   LayoutDashboard, Utensils, Table2, Package, Users, MessageSquare,
-  BarChart3, LogOut, ClipboardList, Building2, ScrollText, Home,
-  Ticket, UserCircle, BarChart2, WifiOff,
+  BarChart3, LogOut, ClipboardList, Building2, ScrollText,
+  Ticket, UserCircle, BarChart2, WifiOff, Sun, Moon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 const managerNav = [
   { to: '/manager', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -31,10 +32,11 @@ const adminNav = [
 export default function DashboardLayout({ title, children, actions }) {
   const { user, logout } = useAuth();
   const { connected } = useSocket();
+  const { dark, toggle } = useTheme();
   const navigate = useNavigate();
   const nav = user?.role === 'admin' ? adminNav : managerNav;
 
-  const branchLabel = user?.branch ? '' : '';
+  const branchLabel = user?.branch ? ' · Branch' : '';
 
   return (
     <div className="min-h-screen flex">
@@ -96,10 +98,10 @@ export default function DashboardLayout({ title, children, actions }) {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200/70 flex items-center justify-between px-6 sticky top-0 z-20">
+        <header className="h-16 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-b border-slate-200/70 dark:border-neutral-800 flex items-center justify-between px-6 sticky top-0 z-20">
           <div className="flex items-center gap-2">
             <span className="text-xl md:hidden">🏨</span>
-            <h1 className="text-lg font-bold tracking-tight">{title}</h1>
+            <h1 className="text-lg font-bold tracking-tight dark:text-white">{title}</h1>
           </div>
           <div className="flex items-center gap-2">
             {actions}
@@ -108,7 +110,14 @@ export default function DashboardLayout({ title, children, actions }) {
                 <WifiOff size={13} /> Offline
               </span>
             )}
-            <button onClick={() => { logout(); navigate('/login'); }} className="p-2 rounded-lg hover:bg-slate-100 md:hidden" title="Sign out">
+            <button
+              onClick={toggle}
+              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors"
+              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {dark ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} className="text-slate-500" />}
+            </button>
+            <button onClick={() => { logout(); navigate('/login'); }} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-neutral-800 md:hidden" title="Sign out">
               <LogOut size={18} />
             </button>
           </div>
@@ -116,17 +125,17 @@ export default function DashboardLayout({ title, children, actions }) {
 
         <main className="flex-1 p-6 overflow-y-auto">
           <div className="md:hidden flex gap-2 mb-5 overflow-x-auto pb-1">
-            {nav.map(({ to, label, icon: Icon }) => (
+            {nav.map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}
-                end={nav.every((n) => n.to !== to) ? false : undefined}
+                end={end}
                 className={({ isActive }) =>
                   clsx(
                     'flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold',
                     isActive
                       ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-brand-glow'
-                      : 'bg-white border border-slate-200 text-slate-600'
+                      :                     'bg-white border border-slate-200 text-slate-600 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300'
                   )
                 }
               >

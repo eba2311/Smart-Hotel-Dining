@@ -39,18 +39,30 @@ function calcOptionsDelta(menuItem, options) {
 }
 
 export function CartProvider({ children }) {
-  const [branch, setBranch] = useState(null);
+  const [branch, setBranchState] = useState(() => {
+    try { return localStorage.getItem('sh_cart_branch') || null; } catch { return null; }
+  });
   const [items, setItems] = useState([]);
 
   useEffect(() => {
-    if (branch) setItems(loadCart(branch));
+    if (branch) {
+      setItems(loadCart(branch));
+      try { localStorage.setItem('sh_cart_branch', branch); } catch {}
+    }
   }, [branch]);
+
+  const setBranch = useCallback((val) => {
+    setBranchState(val);
+  }, []);
 
   const addItem = useCallback(
     (menuItem, qty, options, note) => {
       const key = `${menuItem._id}:${JSON.stringify(options)}`;
       const optionsDelta = calcOptionsDelta(menuItem, options);
-      const unitPrice = Number(menuItem.price || 0) + optionsDelta;
+      const basePrice = (menuItem.promotionPrice && menuItem.promotionPrice < menuItem.price)
+        ? menuItem.promotionPrice
+        : Number(menuItem.price || 0);
+      const unitPrice = basePrice + optionsDelta;
 
       setItems((prev) => {
         const existing = prev.find((i) => i.key === key);
@@ -111,7 +123,9 @@ export function CartProvider({ children }) {
   const count = useMemo(() => items.reduce((s, i) => s + i.qty, 0), [items]);
 
   return (
-    <CartContext.Provider value={{ branch, setBranch, items, addItem, updateQty, removeItem, clear, subtotal, count }}>
+    <CartContext.Provider
+      value={{ branch, setBranch, items, addItem, updateQty, removeItem, clear, subtotal, count }}
+    >
       {children}
     </CartContext.Provider>
   );

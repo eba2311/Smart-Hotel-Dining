@@ -37,6 +37,7 @@ const orderSchema = new mongoose.Schema(
     discount: { type: Number, default: 0 },
     couponCode: { type: String, default: '' },
     tax: { type: Number, default: 0 },
+    tip: { type: Number, default: 0 },
     total: { type: Number, required: true },
     status: {
       type: String,
@@ -60,6 +61,7 @@ const orderSchema = new mongoose.Schema(
     note: { type: String, default: '' },
     cancelledReason: { type: String, default: '' },
     source: { type: String, enum: ['qr', 'counter', 'room'], default: 'qr' },
+    idempotencyKey: { type: String, default: null },
   },
   { timestamps: true }
 );
@@ -67,5 +69,6 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ branch: 1, createdAt: -1 });
 orderSchema.index({ customerId: 1, createdAt: -1 });
 orderSchema.index({ status: 1 });
+orderSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('Order', orderSchema);

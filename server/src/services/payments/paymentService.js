@@ -12,6 +12,7 @@
 import Payment from '../../models/Payment.js';
 import { randomCode } from '../../utils/helpers.js';
 import { config } from '../../config/env.js';
+import { AppError } from '../../utils/AppError.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -60,18 +61,27 @@ export const paymentService = {
    * the client-sent amount, otherwise the request is rejected.
    */
   async processPayment(order, method, clientAmount, meta = {}) {
-    if (Math.abs(order.total - clientAmount) > 0.01) {
-      throw new Error('Payment amount mismatch detected — please refresh and retry');
-    }
     const provider = createProvider(process.env.PAYMENT_PROVIDER || 'mock');
 
-    let payment = await Payment.findOne({ order: order._id });
-    if (!payment) {
-      payment = await this.createPayment(order, method, order.total, meta);
+    let payment = await Payment.findOneAndUpdate(
+      { order: order._id },
+      { $setOnInsert: { branch: order.branch, method, amount: order.total, currency: config.currency, status: 'pending', provider: provider.name, meta } },
+      { upsert: true, new: true, runValidators: true }
+    );
+
+    if (payment.status !== 'pending' && payment.status !== 'processing') {
+      throw new AppError('Payment already processed for this order', 400);
     }
 
     payment.status = 'processing';
     await payment.save();
+
+    if (!order.payment) {
+      order.payment = payment._id;
+      order.paymentMethod = method;
+      order.paymentStatus = 'pending';
+      await order.save();
+    }
 
     const result = await provider.charge({ amount: order.total, method, ref: payment._id.toString() });
 
@@ -95,7 +105,7 @@ export const paymentService = {
 
   async verifyPayment(paymentId) {
     const payment = await Payment.findById(paymentId);
-    if (!payment) throw new Error('PAYMENT_NOT_FOUND');
+    if (!payment) throw new AppError('Payment not found', 404);
     return payment;
   },
 };

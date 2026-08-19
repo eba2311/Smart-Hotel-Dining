@@ -12,6 +12,7 @@ export function AuthProvider({ children }) {
     }
   });
   const [loading, setLoading] = useState(false);
+  const [socketReconnect, setSocketReconnect] = useState(null);
 
   const login = useCallback(async (email, password) => {
     setLoading(true);
@@ -20,16 +21,19 @@ export function AuthProvider({ children }) {
       localStorage.setItem('sh_token', res.token);
       localStorage.setItem('sh_user', JSON.stringify(res.data));
       setUser(res.data);
+      setTimeout(() => setSocketReconnect((v) => (v || 0) + 1), 0);
       return res.data;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try { await authApi.logout(); } catch {}
     localStorage.removeItem('sh_token');
     localStorage.removeItem('sh_user');
     setUser(null);
+    setTimeout(() => setSocketReconnect((v) => (v || 0) + 1), 0);
   }, []);
 
   useEffect(() => {
@@ -46,8 +50,16 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const updateUser = useCallback((data) => {
+    setUser((prev) => {
+      const next = { ...prev, ...data };
+      localStorage.setItem('sh_user', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading, socketReconnect }}>
       {children}
     </AuthContext.Provider>
   );
