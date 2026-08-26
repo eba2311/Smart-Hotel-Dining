@@ -23,7 +23,7 @@ const server = http.createServer(app);
 
 // Enhanced Socket.IO configuration with better error handling
 const io = new Server(server, {
-  cors: { origin: config.clientOrigin, credentials: true },
+  cors: { origin: '*', credentials: true },
   pingTimeout: 30000,
   pingInterval: 10000,
   maxHttpBufferSize: 1e6, // 1MB
@@ -152,11 +152,17 @@ app.get('/health', (req, res) => {
 
 async function start() {
   try {
-    await connectDb();
-    server.listen(config.port, () => {
+    const dbConnected = await connectDb();
+    if (dbConnected) {
+      console.log('✅ Database ready');
+    } else {
+      console.log('⚠️ Running without database - API will have limited functionality');
+    }
+    server.listen(config.port, '0.0.0.0', () => {
       console.log(`🚀 Smart Hotel API running on http://localhost:${config.port}`);
       console.log(`📊 Environment: ${config.nodeEnv}`);
       console.log(`🔌 WebSocket server ready`);
+      console.log(`📡 Database: ${dbConnected ? 'connected' : 'degraded mode'}`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

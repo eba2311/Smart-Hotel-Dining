@@ -3,39 +3,31 @@ setlocal
 cd /d "%~dp0"
 
 echo ============================================
-echo    Smart Hotel - Starting
+echo    Smart Hotel - Starting in ONE window
 echo ============================================
 echo.
 
-:: Check Node.js
 where node >nul 2>nul
 if errorlevel 1 (
-    echo ERROR: Node.js is not installed.
+    echo ERROR: Node.js not found. Install from https://nodejs.org/
     pause
     exit /b 1
 )
 
-:: Kill old servers on ports 5000 and 5173
-echo Clearing ports...
+:: Kill old servers
 powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 5000,5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }" 2>nul
 timeout /t 2 /nobreak >nul
 
-:: Create .env if missing
+:: Ensure .env exists
 if not exist "server\.env" copy "server\.env.example" "server\.env" >nul 2>nul
 
-echo Starting API server (port 5000)...
-start "SmartHotel-API" /D "%~dp0server" cmd /k "node src\index.js"
-
-timeout /t 3 /nobreak >nul
-
-echo Starting Web client (port 5173)...
-start "SmartHotel-Web" /D "%~dp0client" cmd /k "npx vite --host"
-
+echo Starting server on http://localhost:5000 ...
+echo Login: manager@hotel.com / Manager@123
 echo.
+echo Press Ctrl+C to stop.
 echo ============================================
-echo    Open http://localhost:5173 in browser
-echo    Or http://localhost:5000 (direct server)
-echo.
-echo    Login: manager@hotel.com / Manager@123
-echo ============================================
+
+:: Run server directly
+cd /d "%~dp0server"
+node src\index.js
 pause

@@ -20,7 +20,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export async function connectDb() {
   console.log('📡 Connecting to MongoDB with optimized settings...');
-  const maxRetries = 10;
+  const maxRetries = 5;
   let retries = 0;
 
   while (retries < maxRetries) {
@@ -28,14 +28,12 @@ export async function connectDb() {
       await mongoose.connect(config.mongoUri, connectionOptions);
       console.log('✅ MongoDB connected with optimized settings');
 
-      // Set up query monitoring in development
       if (config.nodeEnv === 'development') {
         mongoose.set('debug', (collectionName, method, query, doc) => {
           console.log(`🔍 MongoDB Query: ${collectionName}.${method}`, JSON.stringify(query));
         });
       }
 
-      // Set up connection event listeners
       mongoose.connection.on('error', (err) => {
         console.error('❌ MongoDB connection error:', err);
       });
@@ -48,15 +46,16 @@ export async function connectDb() {
         console.log('✅ MongoDB reconnected');
       });
 
-      return;
+      return true;
     } catch (err) {
       retries++;
-      console.error(`❌ MongoDB connection failed (attempt ${retries}/${maxRetries}), retrying in 5s...`, err.message);
+      console.error(`❌ MongoDB connection failed (attempt ${retries}/${maxRetries}), retrying in 3s...`, err.message);
       if (retries >= maxRetries) {
-        console.error('❌ Max retries reached. Exiting.');
-        process.exit(1);
+        console.error('⚠️ Could not connect to MongoDB. Starting server in degraded mode (no database).');
+        console.error('⚠️ Start MongoDB and restart the server for full functionality.');
+        return false;
       }
-      await new Promise((r) => setTimeout(r, 5000));
+      await new Promise((r) => setTimeout(r, 3000));
     }
   }
 }

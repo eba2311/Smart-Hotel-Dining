@@ -405,6 +405,7 @@ const seed = async () => {
       const status = statuses[Math.floor(Math.random() * statuses.length)];
 
       const order = await Order.create({
+        orderNumber: `ORD-${String(1000 + orders.length + 1).padStart(5, '0')}`,
         branch: restaurant._id,
         table: targetTable?._id,
         customerId: guests[Math.floor(Math.random() * guests.length)]._id,
