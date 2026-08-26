@@ -1,20 +1,25 @@
 import React from 'react';
-import QRCode from 'qrcode';
-import { useEffect, useRef } from 'react';
 
 export default function QrDisplay({ url, size = 200 }) {
-  const ref = useRef(null);
+  if (!url) {
+    return (
+      <div
+        style={{ width: size, height: size }}
+        className="rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-sm"
+      >
+        No URL
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    if (!url) return;
-    QRCode.toDataURL(url, {
-      width: size,
-      margin: 1,
-      color: { dark: '#1a3a8f', light: '#ffffff' },
-    }).then((dataUrl) => {
-      if (ref.current) ref.current.src = dataUrl;
-    });
-  }, [url, size]);
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&color=1a3a8f&bgcolor=ffffff&margin=10`;
 
-  return <img ref={ref} alt="QR code" style={{ width: size, height: size }} className="rounded-lg" />;
+  return (
+    <img
+      src={qrUrl}
+      alt="QR code"
+      style={{ width: size, height: size }}
+      className="rounded-lg"
+    />
+  );
 }

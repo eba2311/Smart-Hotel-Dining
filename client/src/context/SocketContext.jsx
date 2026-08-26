@@ -16,7 +16,7 @@ export function SocketProvider({ children }) {
       socketRef.current.removeAllListeners();
       socketRef.current.disconnect();
     }
-    const s = io({ auth: { token } });
+    const s = io(import.meta.env.VITE_API_URL || undefined, { auth: { token } });
     socketRef.current = s;
     s.on('connect', () => { setConnected(true); setSocket(s); });
     s.on('disconnect', () => setConnected(false));

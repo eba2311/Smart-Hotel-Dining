@@ -5,7 +5,7 @@ const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
