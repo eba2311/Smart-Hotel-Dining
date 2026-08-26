@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate, lazy, Suspense } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { SocketProvider } from './context/SocketContext.jsx';
 import { CartProvider } from './context/CartContext.jsx';
